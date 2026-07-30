@@ -1,0 +1,10 @@
+{
+  "name": "nath-enterprises-sms",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "backend": "cd backend && node server.js",
+    "frontend": "cd frontend && npm run dev",
+    "dev": "echo 'Run backend and frontend in separate terminals: npm run backend / npm run frontend'"
+  }
+}
