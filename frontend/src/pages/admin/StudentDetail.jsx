@@ -5,8 +5,10 @@ import api from '../../api';
 import { formatCurrency, formatDate } from '../../utils';
 import AddStudentModal from '../../components/AddStudentModal';
 import CollectFeeModal from '../../components/CollectFeeModal';
+import { useToast } from '../../components/Toast';
 
 export default function StudentDetail() {
+  const toast = useToast();
   const { id } = useParams();
   const navigate = useNavigate();
   const [data, setData] = useState(null);
@@ -19,7 +21,10 @@ export default function StudentDetail() {
     api
       .get(`/admin/students/${id}`)
       .then((res) => setData(res.data.data))
-      .catch(() => navigate('/admin/students'))
+      .catch(() => {
+        toast.error('Student not found');
+        navigate('/admin/students');
+      })
       .finally(() => setLoading(false));
   };
 
@@ -29,8 +34,13 @@ export default function StudentDetail() {
 
   const handleDelete = async () => {
     if (!confirm('Delete this student and all their fee records? This cannot be undone.')) return;
-    await api.delete(`/admin/students/${id}`);
-    navigate('/admin/students');
+    try {
+      await api.delete(`/admin/students/${id}`);
+      toast.success('Student deleted successfully');
+      navigate('/admin/students');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete student');
+    }
   };
 
   if (loading) return <div className="spinner" />;

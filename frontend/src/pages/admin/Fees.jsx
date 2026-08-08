@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { IndianRupee, Plus, X, Loader2 } from 'lucide-react';
 import api from '../../api';
 import { formatCurrency, formatDate } from '../../utils';
+import { useToast } from '../../components/Toast';
 
 export default function Fees() {
+  const toast = useToast();
   const [payments, setPayments] = useState([]);
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -17,7 +19,6 @@ export default function Fees() {
     remark: '',
     paymentDate: new Date().toISOString().slice(0, 10),
   });
-  const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
   const loadStudents = () =>
@@ -34,7 +35,7 @@ export default function Fees() {
       const { data } = await api.get(`/admin/fees?${q}`);
       setPayments(data.data);
     } catch (err) {
-      console.error(err);
+      toast.error('Failed to load payments');
     } finally {
       setLoading(false);
     }
@@ -60,7 +61,6 @@ export default function Fees() {
       remark: '',
       paymentDate: new Date().toISOString().slice(0, 10),
     });
-    setError('');
     setShowCollect(true);
   };
 
@@ -75,13 +75,12 @@ export default function Fees() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
     if (!form.studentId || !form.amount || form.amount <= 0) {
-      setError('Select student and enter a valid amount');
+      toast.warning('Select student and enter a valid amount');
       return;
     }
     if (Number(form.amount) > pending) {
-      setError(`Amount exceeds pending fee (${formatCurrency(pending)})`);
+      toast.warning(`Amount exceeds pending fee (${formatCurrency(pending)})`);
       return;
     }
     setSaving(true);
@@ -93,11 +92,12 @@ export default function Fees() {
         remark: form.remark,
         paymentDate: form.paymentDate,
       });
+      toast.success('Fee collected successfully');
       setShowCollect(false);
       fetchPayments();
       loadStudents();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to collect fee');
+      toast.error(err.response?.data?.message || 'Failed to collect fee');
     } finally {
       setSaving(false);
     }
@@ -185,7 +185,6 @@ export default function Fees() {
             </div>
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
-                {error && <div className="alert alert-error">{error}</div>}
                 <div className="form-group">
                   <label>
                     Student <span className="req">*</span>

@@ -1,19 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { User, Lock, Loader2, CheckCircle, Camera } from 'lucide-react';
+import { User, Lock, Loader2, Camera } from 'lucide-react';
 import api from '../api';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../components/Toast';
 
-const AVATAR_MAX = 50 * 1024; // 50 KB
+const AVATAR_MAX = 50 * 1024;
 
 export default function Profile() {
+  const toast = useToast();
   const { user, role, updateUser } = useAuth();
   const [params] = useSearchParams();
   const [tab, setTab] = useState(params.get('tab') === 'password' ? 'password' : 'profile');
   const [profile, setProfile] = useState({});
   const [passwords, setPasswords] = useState({ currentPassword: '', newPassword: '', confirm: '' });
-  const [msg, setMsg] = useState('');
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef(null);
@@ -48,14 +48,12 @@ export default function Profile() {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
-    setError('');
-    setMsg('');
     if (!file.type.startsWith('image/')) {
-      setError('Please select an image file (JPG, PNG, WEBP)');
+      toast.warning('Please select an image file (JPG, PNG, WEBP)');
       return;
     }
     if (file.size > AVATAR_MAX) {
-      setError(`Profile photo must be 50 KB or less (yours is ${Math.round(file.size / 1024)} KB)`);
+      toast.warning(`Profile photo must be 50 KB or less (yours is ${Math.round(file.size / 1024)} KB)`);
       return;
     }
     setUploading(true);
@@ -66,9 +64,9 @@ export default function Profile() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       updateUser(data.user);
-      setMsg('Profile photo updated');
+      toast.success('Profile photo updated');
     } catch (err) {
-      setError(err.response?.data?.message || 'Photo upload failed');
+      toast.error(err.response?.data?.message || 'Photo upload failed');
     } finally {
       setUploading(false);
     }
@@ -76,16 +74,14 @@ export default function Profile() {
 
   const saveProfile = async (e) => {
     e.preventDefault();
-    setError('');
-    setMsg('');
     setLoading(true);
     try {
-      const endpoint = role === 'admin' ? '/auth/profile' : '/student/profile';
+      const endpoint = role === 'student' ? '/student/profile' : '/auth/profile';
       const { data } = await api.put(endpoint, profile);
       updateUser(data.user);
-      setMsg('Profile updated successfully');
+      toast.success('Profile updated successfully');
     } catch (err) {
-      setError(err.response?.data?.message || 'Update failed');
+      toast.error(err.response?.data?.message || 'Update failed');
     } finally {
       setLoading(false);
     }
@@ -93,14 +89,12 @@ export default function Profile() {
 
   const changePassword = async (e) => {
     e.preventDefault();
-    setError('');
-    setMsg('');
     if (passwords.newPassword !== passwords.confirm) {
-      setError('New passwords do not match');
+      toast.warning('New passwords do not match');
       return;
     }
     if (passwords.newPassword.length < 6) {
-      setError('Password must be at least 6 characters');
+      toast.warning('Password must be at least 6 characters');
       return;
     }
     setLoading(true);
@@ -109,10 +103,10 @@ export default function Profile() {
         currentPassword: passwords.currentPassword,
         newPassword: passwords.newPassword,
       });
-      setMsg('Password changed successfully');
+      toast.success('Password changed successfully');
       setPasswords({ currentPassword: '', newPassword: '', confirm: '' });
     } catch (err) {
-      setError(err.response?.data?.message || 'Password change failed');
+      toast.error(err.response?.data?.message || 'Password change failed');
     } finally {
       setLoading(false);
     }
@@ -121,22 +115,15 @@ export default function Profile() {
   return (
     <div style={{ maxWidth: 560 }}>
       <div className="role-tabs" style={{ marginBottom: '1.25rem', maxWidth: 320 }}>
-        <button type="button" className={`role-tab ${tab === 'profile' ? 'active' : ''}`} onClick={() => { setTab('profile'); setMsg(''); setError(''); }}>
+        <button type="button" className={`role-tab ${tab === 'profile' ? 'active' : ''}`} onClick={() => setTab('profile')}>
           <User size={14} style={{ display: 'inline', marginRight: 4, verticalAlign: -2 }} />
           Profile
         </button>
-        <button type="button" className={`role-tab ${tab === 'password' ? 'active' : ''}`} onClick={() => { setTab('password'); setMsg(''); setError(''); }}>
+        <button type="button" className={`role-tab ${tab === 'password' ? 'active' : ''}`} onClick={() => setTab('password')}>
           <Lock size={14} style={{ display: 'inline', marginRight: 4, verticalAlign: -2 }} />
           Password
         </button>
       </div>
-
-      {msg && (
-        <div className="alert alert-success" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <CheckCircle size={16} /> {msg}
-        </div>
-      )}
-      {error && <div className="alert alert-error">{error}</div>}
 
       <div className="card">
         <div className="card-body">
@@ -194,6 +181,33 @@ export default function Profile() {
                     <label>Phone</label>
                     <input className="form-control" value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} />
                   </div>
+                </>
+              ) : role === 'employee' ? (
+                <>
+                  <div className="form-group">
+                    <label>Phone (login ID — contact admin to change)</label>
+                    <input className="form-control" value={profile.phone} disabled />
+                  </div>
+                  <div className="form-group">
+                    <label>Email</label>
+                    <input className="form-control" type="email" value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} />
+                  </div>
+                  <div className="form-group">
+                    <label>Address</label>
+                    <textarea className="form-control" value={profile.address} onChange={(e) => setProfile({ ...profile, address: e.target.value })} />
+                  </div>
+                  {user?.department && (
+                    <div className="form-group">
+                      <label>Department</label>
+                      <input className="form-control" value={user.department} disabled />
+                    </div>
+                  )}
+                  {user?.designation && (
+                    <div className="form-group">
+                      <label>Designation</label>
+                      <input className="form-control" value={user.designation} disabled />
+                    </div>
+                  )}
                 </>
               ) : (
                 <>

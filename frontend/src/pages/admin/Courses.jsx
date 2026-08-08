@@ -2,16 +2,17 @@ import { useEffect, useState } from 'react';
 import { BookOpen, Plus, X, Loader2, Pencil, Trash2 } from 'lucide-react';
 import api from '../../api';
 import { formatCurrency } from '../../utils';
+import { useToast } from '../../components/Toast';
 
 const emptyForm = { name: '', description: '', defaultFee: '', duration: '', isActive: true };
 
 export default function Courses() {
+  const toast = useToast();
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(emptyForm);
-  const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
   const fetch = () => {
@@ -29,7 +30,6 @@ export default function Courses() {
   const openAdd = () => {
     setEditing(null);
     setForm(emptyForm);
-    setError('');
     setShowModal(true);
   };
 
@@ -42,15 +42,13 @@ export default function Courses() {
       duration: c.duration || '',
       isActive: c.isActive !== false,
     });
-    setError('');
     setShowModal(true);
   };
 
   const handleSave = async (e) => {
     e.preventDefault();
-    setError('');
     if (!form.name.trim()) {
-      setError('Course name is required');
+      toast.warning('Course name is required');
       return;
     }
     setSaving(true);
@@ -64,13 +62,15 @@ export default function Courses() {
       };
       if (editing) {
         await api.put(`/admin/courses/${editing._id}`, payload);
+        toast.success('Course updated successfully');
       } else {
         await api.post('/admin/courses', payload);
+        toast.success('Course added successfully');
       }
       setShowModal(false);
       fetch();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save course');
+      toast.error(err.response?.data?.message || 'Failed to save course');
     } finally {
       setSaving(false);
     }
@@ -80,9 +80,10 @@ export default function Courses() {
     if (!confirm(`Delete course "${c.name}"? This cannot be undone.`)) return;
     try {
       await api.delete(`/admin/courses/${c._id}`);
+      toast.success(`"${c.name}" deleted`);
       fetch();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to delete course');
+      toast.error(err.response?.data?.message || 'Failed to delete course');
     }
   };
 
@@ -176,7 +177,6 @@ export default function Courses() {
             </div>
             <form onSubmit={handleSave}>
               <div className="modal-body">
-                {error && <div className="alert alert-error">{error}</div>}
                 <div className="form-group">
                   <label>
                     Course Name <span className="req">*</span>

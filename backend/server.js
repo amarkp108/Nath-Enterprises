@@ -20,6 +20,11 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/student', require('./routes/student'));
+app.use('/api/attendance', require('./routes/attendance'));
+app.use('/api/hrm', require('./routes/hrm'));
+app.use('/api/homework', require('./routes/homework'));
+app.use('/api/leave', require('./routes/leave'));
+app.use('/api/settings', require('./routes/settings'));
 
 app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'Nath Enterprises API is running' });

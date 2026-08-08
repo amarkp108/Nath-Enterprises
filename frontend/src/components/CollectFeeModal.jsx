@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import api from '../api';
 import { formatCurrency } from '../utils';
+import { useToast } from './Toast';
 
 export default function CollectFeeModal({ student, onClose, onSuccess }) {
+  const toast = useToast();
   const pending = student.totalFee - student.paidFee;
   const [form, setForm] = useState({
     amount: pending,
@@ -11,18 +13,16 @@ export default function CollectFeeModal({ student, onClose, onSuccess }) {
     remark: '',
     paymentDate: new Date().toISOString().slice(0, 10),
   });
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
     if (!form.amount || form.amount <= 0) {
-      setError('Enter a valid amount');
+      toast.warning('Enter a valid amount');
       return;
     }
     if (Number(form.amount) > pending) {
-      setError(`Amount cannot exceed pending fee (${formatCurrency(pending)})`);
+      toast.warning(`Amount cannot exceed pending fee (${formatCurrency(pending)})`);
       return;
     }
     setLoading(true);
@@ -34,9 +34,10 @@ export default function CollectFeeModal({ student, onClose, onSuccess }) {
         remark: form.remark,
         paymentDate: form.paymentDate,
       });
+      toast.success('Fee collected successfully');
       onSuccess();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to collect fee');
+      toast.error(err.response?.data?.message || 'Failed to collect fee');
     } finally {
       setLoading(false);
     }
@@ -53,8 +54,6 @@ export default function CollectFeeModal({ student, onClose, onSuccess }) {
         </div>
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
-            {error && <div className="alert alert-error">{error}</div>}
-
             <div style={{ background: 'var(--bg)', padding: '1rem', borderRadius: 'var(--radius-xs)', marginBottom: '1.25rem' }}>
               <strong>{student.name}</strong>
               <div style={{ fontSize: '0.85rem', color: 'var(--ink-muted)', marginTop: 2 }}>

@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import { Upload, Trash2, FileText, Loader2 } from 'lucide-react';
 import api from '../../api';
 import { formatDate } from '../../utils';
+import { useToast } from '../../components/Toast';
 
 export default function StudentDocuments() {
+  const toast = useToast();
   const [docs, setDocs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [msg, setMsg] = useState('');
-  const [error, setError] = useState('');
 
   const fetch = () => {
     api
@@ -25,11 +25,9 @@ export default function StudentDocuments() {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     setUploading(true);
-    setError('');
-    setMsg('');
     const tooBig = files.find((f) => f.size > 100 * 1024);
     if (tooBig) {
-      setError(`"${tooBig.name}" exceeds 100 KB limit (${Math.round(tooBig.size / 1024)} KB)`);
+      toast.warning(`"${tooBig.name}" exceeds 100 KB limit (${Math.round(tooBig.size / 1024)} KB)`);
       setUploading(false);
       e.target.value = '';
       return;
@@ -41,9 +39,9 @@ export default function StudentDocuments() {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       setDocs(data.data);
-      setMsg('Documents uploaded successfully');
+      toast.success('Documents uploaded successfully');
     } catch (err) {
-      setError(err.response?.data?.message || 'Upload failed');
+      toast.error(err.response?.data?.message || 'Upload failed');
     } finally {
       setUploading(false);
       e.target.value = '';
@@ -52,17 +50,19 @@ export default function StudentDocuments() {
 
   const handleDelete = async (docId) => {
     if (!confirm('Remove this document?')) return;
-    const { data } = await api.delete(`/student/documents/${docId}`);
-    setDocs(data.data);
+    try {
+      const { data } = await api.delete(`/student/documents/${docId}`);
+      setDocs(data.data);
+      toast.success('Document removed');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to remove document');
+    }
   };
 
   if (loading) return <div className="spinner" />;
 
   return (
     <>
-      {msg && <div className="alert alert-success">{msg}</div>}
-      {error && <div className="alert alert-error">{error}</div>}
-
       <div className="card" style={{ marginBottom: '1.25rem' }}>
         <div className="card-body" style={{ textAlign: 'center', padding: '2rem' }}>
           <Upload size={32} style={{ color: 'var(--brand)', margin: '0 auto 0.75rem' }} />
@@ -71,7 +71,7 @@ export default function StudentDocuments() {
             ID proof, marksheets, certificates (PDF, JPG, PNG — max 100 KB each)
           </p>
           <label className="btn btn-primary" style={{ cursor: 'pointer' }}>
-            {uploading ? <Loader2 size={16} /> : <Upload size={16} />}
+            {uploading ? <Loader2 size={16} className="spin" /> : <Upload size={16} />}
             {uploading ? 'Uploading...' : 'Choose Files'}
             <input type="file" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" hidden onChange={handleUpload} disabled={uploading} />
           </label>

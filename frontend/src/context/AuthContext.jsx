@@ -33,7 +33,12 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = async (credentials, loginRole) => {
-    const endpoint = loginRole === 'admin' ? '/auth/admin/login' : '/auth/student/login';
+    const endpoint =
+      loginRole === 'admin'
+        ? '/auth/admin/login'
+        : loginRole === 'employee'
+          ? '/auth/employee/login'
+          : '/auth/student/login';
     const { data } = await api.post(endpoint, credentials);
     localStorage.setItem('token', data.token);
     localStorage.setItem('role', data.role);

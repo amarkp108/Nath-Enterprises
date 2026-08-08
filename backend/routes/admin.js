@@ -2,14 +2,14 @@ const express = require('express');
 const Student = require('../models/Student');
 const FeePayment = require('../models/FeePayment');
 const Course = require('../models/Course');
-const { protect, adminOnly } = require('../middleware/auth');
+const { protect, adminOrEmployee, requirePerm } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 
 const router = express.Router();
-router.use(protect, adminOnly);
+router.use(protect, adminOrEmployee);
 
 // Dashboard stats
-router.get('/dashboard', async (req, res) => {
+router.get('/dashboard', requirePerm('dashboard', 'view'), async (req, res) => {
   try {
     const now = new Date();
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -121,7 +121,7 @@ router.get('/dashboard', async (req, res) => {
 });
 
 // Get all students with filters
-router.get('/students', async (req, res) => {
+router.get('/students', requirePerm('students', 'view'), async (req, res) => {
   try {
     const { course, pending, search, status, page = 1, limit = 50 } = req.query;
     const filter = {};
@@ -159,7 +159,7 @@ router.get('/students', async (req, res) => {
 });
 
 // Get single student with payments
-router.get('/students/:id', async (req, res) => {
+router.get('/students/:id', requirePerm('students', 'view'), async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
@@ -171,7 +171,7 @@ router.get('/students/:id', async (req, res) => {
 });
 
 // Add student
-router.post('/students', (req, res) => {
+router.post('/students', requirePerm('students', 'create'), (req, res) => {
   upload.fields([
     { name: 'documents', maxCount: 5 },
     { name: 'avatar', maxCount: 1 },
@@ -232,7 +232,7 @@ router.post('/students', (req, res) => {
 });
 
 // Update student
-router.put('/students/:id', (req, res) => {
+router.put('/students/:id', requirePerm('students', 'edit'), (req, res) => {
   upload.fields([
     { name: 'documents', maxCount: 5 },
     { name: 'avatar', maxCount: 1 },
@@ -281,7 +281,7 @@ router.put('/students/:id', (req, res) => {
 });
 
 // Delete student
-router.delete('/students/:id', async (req, res) => {
+router.delete('/students/:id', requirePerm('students', 'delete'), async (req, res) => {
   try {
     const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
@@ -294,7 +294,7 @@ router.delete('/students/:id', async (req, res) => {
 });
 
 // Collect fee
-router.post('/fees', async (req, res) => {
+router.post('/fees', requirePerm('fees', 'create'), async (req, res) => {
   try {
     const { studentId, amount, paymentMode, remark, paymentDate } = req.body;
     if (!studentId || !amount || amount <= 0) {
@@ -329,7 +329,7 @@ router.post('/fees', async (req, res) => {
 });
 
 // Fee history
-router.get('/fees', async (req, res) => {
+router.get('/fees', requirePerm('fees', 'view'), async (req, res) => {
   try {
     const { from, to, studentId, page = 1, limit = 50 } = req.query;
     const filter = {};
@@ -363,7 +363,7 @@ router.get('/fees', async (req, res) => {
 });
 
 // Courses CRUD
-router.get('/courses', async (req, res) => {
+router.get('/courses', requirePerm('courses', 'view'), async (req, res) => {
   try {
     let courses = await Course.find().sort({ name: 1 });
     if (courses.length === 0) {
@@ -382,7 +382,7 @@ router.get('/courses', async (req, res) => {
   }
 });
 
-router.post('/courses', async (req, res) => {
+router.post('/courses', requirePerm('courses', 'create'), async (req, res) => {
   try {
     const { name, description, defaultFee, duration, isActive } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Course name is required' });
@@ -401,7 +401,7 @@ router.post('/courses', async (req, res) => {
   }
 });
 
-router.put('/courses/:id', async (req, res) => {
+router.put('/courses/:id', requirePerm('courses', 'edit'), async (req, res) => {
   try {
     const { name, description, defaultFee, duration, isActive } = req.body;
     const course = await Course.findById(req.params.id);
@@ -424,7 +424,7 @@ router.put('/courses/:id', async (req, res) => {
   }
 });
 
-router.delete('/courses/:id', async (req, res) => {
+router.delete('/courses/:id', requirePerm('courses', 'delete'), async (req, res) => {
   try {
     const course = await Course.findById(req.params.id);
     if (!course) return res.status(404).json({ success: false, message: 'Course not found' });

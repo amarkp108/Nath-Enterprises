@@ -4,16 +4,15 @@ const path = require('path');
 const fs = require('fs');
 const Admin = require('../models/Admin');
 const Student = require('../models/Student');
-const Employee = require('../models/Employee');
 const { protect } = require('../middleware/auth');
 const { uploadAvatar } = require('../middleware/upload');
-const { MODULES } = require('../constants/modules');
 
 const router = express.Router();
 
 const generateToken = (id, role) =>
   jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRE || '7d' });
 
+// Admin login
 router.post('/admin/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -35,30 +34,7 @@ router.post('/admin/login', async (req, res) => {
   }
 });
 
-router.post('/employee/login', async (req, res) => {
-  try {
-    const { phone, password } = req.body;
-    if (!phone || !password) {
-      return res.status(400).json({ success: false, message: 'Phone and password are required' });
-    }
-    const employee = await Employee.findOne({ phone: phone.trim() }).select('+password');
-    if (!employee || !(await employee.matchPassword(password))) {
-      return res.status(401).json({ success: false, message: 'Invalid phone or password' });
-    }
-    if (employee.status !== 'Active') {
-      return res.status(403).json({ success: false, message: 'Your account is inactive. Contact admin.' });
-    }
-    res.json({
-      success: true,
-      token: generateToken(employee._id, 'employee'),
-      user: employee,
-      role: 'employee',
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-});
-
+// Student login (phone + password)
 router.post('/student/login', async (req, res) => {
   try {
     const { phone, password } = req.body;
@@ -83,22 +59,12 @@ router.post('/student/login', async (req, res) => {
   }
 });
 
+// Get current user profile
 router.get('/me', protect, async (req, res) => {
-  res.json({
-    success: true,
-    user: req.user,
-    role: req.role,
-    modules: req.role === 'admin' ? MODULES : undefined,
-  });
+  res.json({ success: true, user: req.user, role: req.role });
 });
 
-router.get('/modules', protect, async (req, res) => {
-  if (req.role !== 'admin') {
-    return res.status(403).json({ success: false, message: 'Admin access only' });
-  }
-  res.json({ success: true, data: MODULES });
-});
-
+// Change password
 router.put('/change-password', protect, async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -108,8 +74,8 @@ router.put('/change-password', protect, async (req, res) => {
     if (newPassword.length < 6) {
       return res.status(400).json({ success: false, message: 'New password must be at least 6 characters' });
     }
-    const Model = req.role === 'admin' ? Admin : req.role === 'employee' ? Employee : Student;
-    const user = await Model.findById(req.user._id).select('+password');
+    const Model = req.role === 'admin' ? Admin : Student;
+    const user = await Model.findById(req.user._id);
     if (!(await user.matchPassword(currentPassword))) {
       return res.status(400).json({ success: false, message: 'Current password is incorrect' });
     }
@@ -121,15 +87,14 @@ router.put('/change-password', protect, async (req, res) => {
   }
 });
 
+// Update profile
 router.put('/profile', protect, async (req, res) => {
   try {
-    const Model = req.role === 'admin' ? Admin : req.role === 'employee' ? Employee : Student;
+    const Model = req.role === 'admin' ? Admin : Student;
     const allowed =
       req.role === 'admin'
         ? ['name', 'phone', 'email']
-        : req.role === 'employee'
-          ? ['name', 'email', 'address']
-          : ['name', 'email', 'address', 'fatherName', 'motherName', 'dateOfBirth', 'gender'];
+        : ['name', 'email', 'address', 'fatherName', 'motherName', 'dateOfBirth', 'gender'];
     const updates = {};
     allowed.forEach((f) => {
       if (req.body[f] !== undefined) updates[f] = req.body[f];
@@ -141,6 +106,7 @@ router.put('/profile', protect, async (req, res) => {
   }
 });
 
+// Upload profile photo (max 50 KB)
 router.put('/avatar', protect, (req, res) => {
   uploadAvatar.single('avatar')(req, res, async (err) => {
     if (err) {
@@ -154,7 +120,7 @@ router.put('/avatar', protect, (req, res) => {
       if (!req.file) {
         return res.status(400).json({ success: false, message: 'Please select an image (max 50 KB)' });
       }
-      const Model = req.role === 'admin' ? Admin : req.role === 'employee' ? Employee : Student;
+      const Model = req.role === 'admin' ? Admin : Student;
       const user = await Model.findById(req.user._id);
       if (user.avatar) {
         const oldPath = path.join(__dirname, '..', user.avatar.replace(/^\//, ''));

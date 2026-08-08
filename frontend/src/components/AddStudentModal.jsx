@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import api from '../api';
+import { useToast } from './Toast';
 
 const AVATAR_MAX = 50 * 1024;
 const DOC_MAX = 100 * 1024;
@@ -23,12 +24,12 @@ const empty = {
 };
 
 export default function AddStudentModal({ onClose, onSuccess, student }) {
+  const toast = useToast();
   const isEdit = !!student;
   const [form, setForm] = useState(empty);
   const [courses, setCourses] = useState([]);
   const [files, setFiles] = useState([]);
   const [avatar, setAvatar] = useState(null);
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -61,14 +62,13 @@ export default function AddStudentModal({ onClose, onSuccess, student }) {
     e.target.value = '';
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      setError('Profile photo must be an image');
+      toast.warning('Profile photo must be an image');
       return;
     }
     if (file.size > AVATAR_MAX) {
-      setError(`Profile photo must be 50 KB or less (selected: ${Math.round(file.size / 1024)} KB)`);
+      toast.warning(`Profile photo must be 50 KB or less (selected: ${Math.round(file.size / 1024)} KB)`);
       return;
     }
-    setError('');
     setAvatar(file);
   };
 
@@ -77,23 +77,21 @@ export default function AddStudentModal({ onClose, onSuccess, student }) {
     e.target.value = '';
     const tooBig = selected.find((f) => f.size > DOC_MAX);
     if (tooBig) {
-      setError(`"${tooBig.name}" exceeds 100 KB limit (${Math.round(tooBig.size / 1024)} KB)`);
+      toast.warning(`"${tooBig.name}" exceeds 100 KB limit (${Math.round(tooBig.size / 1024)} KB)`);
       return;
     }
-    setError('');
     setFiles(selected);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
 
     if (!form.name || !form.phone || !form.course || form.totalFee === '') {
-      setError('Name, phone, course and fee are required');
+      toast.warning('Name, phone, course and fee are required');
       return;
     }
     if (!isEdit && !form.password) {
-      setError('Password is required for new students');
+      toast.warning('Password is required for new students');
       return;
     }
 
@@ -110,14 +108,16 @@ export default function AddStudentModal({ onClose, onSuccess, student }) {
         await api.put(`/admin/students/${student._id}`, fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
+        toast.success('Student updated successfully');
       } else {
         await api.post('/admin/students', fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
+        toast.success('Student added successfully');
       }
       onSuccess();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save student');
+      toast.error(err.response?.data?.message || 'Failed to save student');
     } finally {
       setLoading(false);
     }
@@ -135,8 +135,6 @@ export default function AddStudentModal({ onClose, onSuccess, student }) {
 
         <form onSubmit={handleSubmit}>
           <div className="modal-body">
-            {error && <div className="alert alert-error">{error}</div>}
-
             <div className="form-row">
               <div className="form-group">
                 <label>

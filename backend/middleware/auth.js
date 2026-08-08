@@ -1,6 +1,7 @@
 const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
 const Student = require('../models/Student');
+const Employee = require('../models/Employee');
 
 const protect = async (req, res, next) => {
   let token;
@@ -14,6 +15,8 @@ const protect = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     if (decoded.role === 'admin') {
       req.user = await Admin.findById(decoded.id);
+    } else if (decoded.role === 'employee') {
+      req.user = await Employee.findById(decoded.id);
     } else {
       req.user = await Student.findById(decoded.id);
     }
@@ -41,4 +44,30 @@ const studentOnly = (req, res, next) => {
   next();
 };
 
-module.exports = { protect, adminOnly, studentOnly };
+const employeeOnly = (req, res, next) => {
+  if (req.role !== 'employee') {
+    return res.status(403).json({ success: false, message: 'Employee access only' });
+  }
+  next();
+};
+
+/** Admin or employee with module permission */
+const adminOrEmployee = (req, res, next) => {
+  if (req.role === 'admin' || req.role === 'employee') return next();
+  return res.status(403).json({ success: false, message: 'Access denied' });
+};
+
+const requirePerm = (module, action = 'view') => (req, res, next) => {
+  if (req.role === 'admin') return next();
+  if (req.role === 'employee' && req.user?.permissions?.[module]?.[action]) return next();
+  return res.status(403).json({ success: false, message: 'You do not have permission for this action' });
+};
+
+module.exports = {
+  protect,
+  adminOnly,
+  studentOnly,
+  employeeOnly,
+  adminOrEmployee,
+  requirePerm,
+};

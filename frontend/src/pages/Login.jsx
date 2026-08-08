@@ -2,22 +2,29 @@ import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../components/Toast';
+import { firstStaffPath } from '../constants/modules';
+
+const homeFor = (role, user) => {
+  if (role === 'student') return '/student';
+  if (role === 'employee') return firstStaffPath(user, role);
+  return '/admin';
+};
 
 export default function Login() {
-  const { login, isAuthenticated, role } = useAuth();
+  const toast = useToast();
+  const { login, isAuthenticated, role, user } = useAuth();
   const [loginRole, setLoginRole] = useState('admin');
   const [form, setForm] = useState({ email: '', phone: '', password: '' });
   const [showPass, setShowPass] = useState(false);
-  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   if (isAuthenticated) {
-    return <Navigate to={role === 'admin' ? '/admin' : '/student'} replace />;
+    return <Navigate to={homeFor(role, user)} replace />;
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
     setLoading(true);
     try {
       const credentials =
@@ -25,8 +32,9 @@ export default function Login() {
           ? { email: form.email, password: form.password }
           : { phone: form.phone, password: form.password };
       await login(credentials, loginRole);
+      toast.success('Login successful');
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed. Please try again.');
+      toast.error(err.response?.data?.message || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -50,30 +58,29 @@ export default function Login() {
           <h2>Welcome back</h2>
           <p className="subtitle">Sign in to continue to your dashboard</p>
 
-          <div className="role-tabs">
+          <div className="role-tabs tabs-3">
             <button
               type="button"
               className={`role-tab ${loginRole === 'admin' ? 'active' : ''}`}
-              onClick={() => {
-                setLoginRole('admin');
-                setError('');
-              }}
+              onClick={() => setLoginRole('admin')}
             >
               Admin
             </button>
             <button
               type="button"
+              className={`role-tab ${loginRole === 'employee' ? 'active' : ''}`}
+              onClick={() => setLoginRole('employee')}
+            >
+              Employee
+            </button>
+            <button
+              type="button"
               className={`role-tab ${loginRole === 'student' ? 'active' : ''}`}
-              onClick={() => {
-                setLoginRole('student');
-                setError('');
-              }}
+              onClick={() => setLoginRole('student')}
             >
               Student
             </button>
           </div>
-
-          {error && <div className="alert alert-error">{error}</div>}
 
           <form onSubmit={handleSubmit}>
             {loginRole === 'admin' ? (
@@ -146,6 +153,11 @@ export default function Login() {
           {loginRole === 'admin' && (
             <p style={{ marginTop: '1.25rem', fontSize: '0.78rem', color: 'var(--ink-muted)', textAlign: 'center' }}>
               Default: admin@nathenterprises.com / Admin@123
+            </p>
+          )}
+          {loginRole === 'employee' && (
+            <p style={{ marginTop: '1.25rem', fontSize: '0.78rem', color: 'var(--ink-muted)', textAlign: 'center' }}>
+              Use phone & password set by admin in HRM
             </p>
           )}
         </div>

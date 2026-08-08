@@ -901,6 +901,15 @@ tr.clickable:hover td {
   margin-bottom: 1.5rem;
 }
 
+.role-tabs.tabs-3 {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.role-tabs.tabs-3 .role-tab {
+  font-size: 0.8rem;
+  padding: 0.55rem 0.25rem;
+}
+
 .role-tab {
   padding: 0.6rem;
   border: none;
@@ -1138,6 +1147,160 @@ tr.clickable:hover td {
 
 .doc-item a:hover {
   text-decoration: underline;
+}
+
+/* ─── Toast ─── */
+.toast-viewport {
+  position: fixed;
+  top: 1.15rem;
+  right: 1.15rem;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-width: min(400px, calc(100vw - 2rem));
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.85rem 0.95rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-lg);
+  animation: toastIn 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  min-width: 260px;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateX(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.toast-icon {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+}
+
+.toast-message {
+  flex: 1;
+  font-size: 0.88rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--ink);
+  padding-top: 0.2rem;
+}
+
+.toast-close {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--ink-muted);
+  cursor: pointer;
+  padding: 0.2rem;
+  border-radius: 6px;
+  display: grid;
+  place-items: center;
+}
+
+.toast-close:hover {
+  background: var(--bg-muted);
+  color: var(--ink);
+}
+
+.toast-success {
+  border-color: #a7f3d0;
+}
+
+.toast-success .toast-icon {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.toast-error {
+  border-color: #fecaca;
+}
+
+.toast-error .toast-icon {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.toast-warning {
+  border-color: #fde68a;
+}
+
+.toast-warning .toast-icon {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.toast-info {
+  border-color: #bae6fd;
+}
+
+.toast-info .toast-icon {
+  background: var(--info-soft);
+  color: var(--info);
+}
+
+@media (max-width: 768px) {
+  .toast-viewport {
+    left: 1rem;
+    right: 1rem;
+    max-width: none;
+  }
+
+  .toast {
+    min-width: 0;
+  }
+}
+
+/* ─── Attendance P/A buttons ─── */
+.attn-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all var(--transition);
+  color: var(--ink-muted);
+}
+
+.attn-btn:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.attn-btn.attn-p.active {
+  background: var(--success);
+  border-color: var(--success);
+  color: white;
+  box-shadow: 0 4px 12px rgba(5, 150, 105, 0.3);
+}
+
+.attn-btn.attn-a.active {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: white;
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
 }
 
 /* ─── Responsive ─── */

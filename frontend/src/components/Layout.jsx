@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -12,19 +12,32 @@ import {
   X,
   ChevronDown,
   Settings,
+  ClipboardCheck,
+  Briefcase,
+  NotebookPen,
+  CalendarOff,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { hasPermission } from '../constants/modules';
 
-const adminLinks = [
-  { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
-  { to: '/admin/students', icon: Users, label: 'Students' },
-  { to: '/admin/fees', icon: IndianRupee, label: 'Fee Collection' },
-  { to: '/admin/courses', icon: BookOpen, label: 'Course Master' },
+const staffLinks = [
+  { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true, module: 'dashboard' },
+  { to: '/admin/students', icon: Users, label: 'Students', module: 'students' },
+  { to: '/admin/fees', icon: IndianRupee, label: 'Fee Collection', module: 'fees' },
+  { to: '/admin/attendance', icon: ClipboardCheck, label: 'Attendance', module: 'attendance' },
+  { to: '/admin/leaves', icon: CalendarOff, label: 'Leaves', module: 'leaves' },
+  { to: '/admin/homework', icon: NotebookPen, label: 'Homework', module: 'homework' },
+  { to: '/admin/hrm', icon: Briefcase, label: 'HRM', adminOnly: true },
+  { to: '/admin/courses', icon: BookOpen, label: 'Course Master', module: 'courses' },
+  { to: '/admin/settings', icon: Settings, label: 'Settings', adminOnly: true },
 ];
 
 const studentLinks = [
   { to: '/student', icon: LayoutDashboard, label: 'Dashboard', end: true },
   { to: '/student/fees', icon: IndianRupee, label: 'My Fees' },
+  { to: '/student/attendance', icon: ClipboardCheck, label: 'My Attendance' },
+  { to: '/student/leave', icon: CalendarOff, label: 'Apply Leave' },
+  { to: '/student/homework', icon: NotebookPen, label: 'My Homework' },
   { to: '/student/documents', icon: BookOpen, label: 'Documents' },
 ];
 
@@ -32,10 +45,27 @@ const titles = {
   '/admin': 'Dashboard',
   '/admin/students': 'Student List',
   '/admin/fees': 'Fee Collection',
+  '/admin/attendance': 'Attendance',
+  '/admin/attendance/mark': 'Mark Attendance',
+  '/admin/attendance/report': 'Attendance Report',
+  '/admin/leaves': 'Leave Requests',
+  '/admin/homework': 'Homework',
+  '/admin/homework/send': 'Send Homework',
+  '/admin/homework/report': 'Homework Sent Report',
+  '/admin/hrm': 'HRM',
+  '/admin/hrm/employees': 'Employees',
+  '/admin/hrm/attendance/mark': 'Mark Employee Attendance',
+  '/admin/hrm/attendance/report': 'Employee Attendance Report',
   '/admin/courses': 'Course Master',
+  '/admin/settings': 'Settings',
+  '/admin/settings/departments': 'Department Master',
+  '/admin/settings/permissions': 'Employee Permissions',
   '/admin/profile': 'My Profile',
   '/student': 'My Dashboard',
   '/student/fees': 'Fee Details',
+  '/student/attendance': 'My Attendance',
+  '/student/leave': 'Apply Leave',
+  '/student/homework': 'My Homework',
   '/student/documents': 'My Documents',
   '/student/profile': 'My Profile',
 };
@@ -48,8 +78,17 @@ export default function Layout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
-  const links = role === 'admin' ? adminLinks : studentLinks;
-  const basePath = role === 'admin' ? '/admin' : '/student';
+  const isStaff = role === 'admin' || role === 'employee';
+  const basePath = isStaff ? '/admin' : '/student';
+
+  const links = useMemo(() => {
+    if (role === 'student') return studentLinks;
+    return staffLinks.filter((l) => {
+      if (l.adminOnly) return role === 'admin';
+      if (role === 'admin') return true;
+      return hasPermission(user, role, l.module, 'view');
+    });
+  }, [role, user]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -65,7 +104,17 @@ export default function Layout() {
 
   const pageTitle =
     titles[location.pathname] ||
-    (location.pathname.includes('/students/') ? 'Student Details' : 'Dashboard');
+    (location.pathname.includes('/students/')
+      ? 'Student Details'
+      : location.pathname.includes('/settings')
+        ? 'Settings'
+        : location.pathname.includes('/homework')
+          ? 'Homework'
+          : location.pathname.includes('/hrm')
+            ? 'HRM'
+            : location.pathname.includes('/attendance')
+              ? 'Attendance'
+              : 'Dashboard');
 
   const initials = user?.name
     ?.split(' ')
@@ -73,6 +122,8 @@ export default function Layout() {
     .join('')
     .slice(0, 2)
     .toUpperCase();
+
+  const roleLabel = role === 'admin' ? 'Administrator' : role === 'employee' ? user?.department || 'Employee' : user?.course;
 
   return (
     <div className="app-shell">
@@ -82,7 +133,7 @@ export default function Layout() {
         <div className="sidebar-brand">
           <div className="logo-mark">N</div>
           <h1>Nath Enterprises</h1>
-          <p>{role === 'admin' ? 'Admin Panel' : 'Student Portal'}</p>
+          <p>{role === 'admin' ? 'Admin Panel' : role === 'employee' ? 'Staff Portal' : 'Student Portal'}</p>
         </div>
 
         <nav className="sidebar-nav">
@@ -121,8 +172,8 @@ export default function Layout() {
             {role === 'admin' && (
               <button
                 className="btn btn-ghost settings-btn"
-                title="Course Master"
-                onClick={() => navigate('/admin/courses')}
+                title="Settings"
+                onClick={() => navigate('/admin/settings')}
                 style={{
                   width: 40,
                   height: 40,
@@ -143,7 +194,7 @@ export default function Layout() {
                 )}
                 <div className="meta">
                   <strong>{user?.name}</strong>
-                  <span>{role === 'admin' ? 'Administrator' : user?.course}</span>
+                  <span>{roleLabel}</span>
                 </div>
                 <ChevronDown size={16} style={{ color: 'var(--ink-muted)', marginRight: 4 }} />
               </button>
@@ -175,11 +226,11 @@ export default function Layout() {
                       className="dropdown-item"
                       onClick={() => {
                         setMenuOpen(false);
-                        navigate('/admin/courses');
+                        navigate('/admin/settings');
                       }}
                     >
                       <Settings size={16} />
-                      Course Master
+                      Settings
                     </button>
                   )}
                   <button
