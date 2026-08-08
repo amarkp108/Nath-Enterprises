@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Upload, Trash2, FileText, Loader2 } from 'lucide-react';
-import api from '../../api';
+import api, { assetUrl } from '../../api';
 import { formatDate } from '../../utils';
 import { useToast } from '../../components/Toast';
 
@@ -95,7 +95,7 @@ export default function StudentDocuments() {
               {docs.map((d) => (
                 <div key={d._id} className="doc-item">
                   <div>
-                    <a href={d.url} target="_blank" rel="noreferrer">
+                    <a href={assetUrl(d.url)} target="_blank" rel="noreferrer">
                       {d.name}
                     </a>
                     <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>{formatDate(d.uploadedAt)}</div>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, IndianRupee, Pencil, Trash2, FileText } from 'lucide-react';
-import api from '../../api';
+import api, { assetUrl } from '../../api';
 import { formatCurrency, formatDate } from '../../utils';
 import AddStudentModal from '../../components/AddStudentModal';
 import CollectFeeModal from '../../components/CollectFeeModal';
@@ -74,7 +74,7 @@ export default function StudentDetail() {
         <div className="card-body">
           <div style={{ display: 'flex', gap: '1.25rem', alignItems: 'center', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
             {student.avatar ? (
-              <img src={student.avatar} alt="" className="avatar lg" style={{ objectFit: 'cover' }} />
+              <img src={assetUrl(student.avatar)} alt="" className="avatar lg" style={{ objectFit: 'cover' }} />
             ) : (
               <div className="avatar lg">
                 {student.name
@@ -190,7 +190,7 @@ export default function StudentDetail() {
               <div className="doc-list">
                 {student.documents.map((d) => (
                   <div key={d._id} className="doc-item">
-                    <a href={d.url} target="_blank" rel="noreferrer">
+                    <a href={assetUrl(d.url)} target="_blank" rel="noreferrer">
                       {d.name}
                     </a>
                     <span style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>{formatDate(d.uploadedAt)}</span>

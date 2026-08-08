@@ -11,8 +11,14 @@ const { MODULES } = require('../constants/modules');
 
 const router = express.Router();
 
-const generateToken = (id, role) =>
-  jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRE || '7d' });
+const generateToken = (id, role) => {
+  const expire = process.env.JWT_EXPIRE;
+  // "never" / empty → no expiry (token stays valid until logout / secret change)
+  if (!expire || expire === 'never' || expire === '0') {
+    return jwt.sign({ id, role }, process.env.JWT_SECRET);
+  }
+  return jwt.sign({ id, role }, process.env.JWT_SECRET, { expiresIn: expire });
+};
 
 router.post('/admin/login', async (req, res) => {
   try {

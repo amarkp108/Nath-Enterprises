@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { User, Lock, Loader2, Camera } from 'lucide-react';
-import api from '../api';
+import api, { assetUrl } from '../api';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
 
@@ -133,7 +133,7 @@ export default function Profile() {
                 <div style={{ position: 'relative' }}>
                   {user?.avatar ? (
                     <img
-                      src={user.avatar}
+                      src={assetUrl(user.avatar)}
                       alt=""
                       className="avatar lg"
                       style={{ objectFit: 'cover', width: 72, height: 72, borderRadius: '50%' }}

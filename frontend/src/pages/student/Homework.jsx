@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { NotebookPen, Paperclip, Calendar } from 'lucide-react';
-import api from '../../api';
+import api, { assetUrl } from '../../api';
 import { formatDate } from '../../utils';
 import { useToast } from '../../components/Toast';
 
@@ -109,7 +109,7 @@ export default function StudentHomework() {
                       )}
                       {h.attachment?.url && (
                         <a
-                          href={h.attachment.url}
+                          href={assetUrl(h.attachment.url)}
                           target="_blank"
                           rel="noreferrer"
                           className="btn btn-outline btn-sm"

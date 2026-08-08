@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, Search, Users, Eye, IndianRupee } from 'lucide-react';
-import api from '../../api';
+import api, { assetUrl } from '../../api';
 import { formatCurrency, formatDate } from '../../utils';
 import AddStudentModal from '../../components/AddStudentModal';
 import CollectFeeModal from '../../components/CollectFeeModal';
@@ -123,7 +123,7 @@ export default function Students() {
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                           {s.avatar ? (
-                            <img src={s.avatar} alt="" className="avatar" style={{ width: 32, height: 32, objectFit: 'cover' }} />
+                            <img src={assetUrl(s.avatar)} alt="" className="avatar" style={{ width: 32, height: 32, objectFit: 'cover' }} />
                           ) : (
                             <div className="avatar" style={{ width: 32, height: 32, fontSize: '0.7rem' }}>
                               {s.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}

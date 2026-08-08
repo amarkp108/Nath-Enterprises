@@ -1,8 +1,18 @@
 import axios from 'axios';
 
+/** Production: https://nath-enterprises.onrender.com — local: empty (Vite proxy) */
+export const API_ORIGIN = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_ORIGIN ? `${API_ORIGIN}/api` : '/api',
 });
+
+/** Resolve /uploads/... paths against API origin in production */
+export const assetUrl = (path) => {
+  if (!path) return '';
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${API_ORIGIN}${path.startsWith('/') ? path : `/${path}`}`;
+};
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');

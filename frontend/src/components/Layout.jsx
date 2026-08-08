@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { hasPermission } from '../constants/modules';
+import { assetUrl } from '../api';
 
 const staffLinks = [
   { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true, module: 'dashboard' },
@@ -188,7 +189,7 @@ export default function Layout() {
             <div ref={menuRef} style={{ position: 'relative' }}>
               <button className="profile-btn" onClick={() => setMenuOpen(!menuOpen)}>
                 {user?.avatar ? (
-                  <img src={user.avatar} alt="" className="avatar" style={{ objectFit: 'cover' }} />
+                  <img src={assetUrl(user.avatar)} alt="" className="avatar" style={{ objectFit: 'cover' }} />
                 ) : (
                   <div className="avatar">{initials}</div>
                 )}

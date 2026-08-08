@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, FileBarChart, Trash2, Eye, X, Paperclip } from 'lucide-react';
-import api from '../../../api';
+import api, { assetUrl } from '../../../api';
 import { formatDate } from '../../../utils';
 import { useToast } from '../../../components/Toast';
 
@@ -230,7 +230,7 @@ export default function HomeworkReport() {
               )}
               {detail.attachment?.url && (
                 <div style={{ marginBottom: '1rem' }}>
-                  <a href={detail.attachment.url} target="_blank" rel="noreferrer" className="btn btn-outline btn-sm">
+                  <a href={assetUrl(detail.attachment.url)} target="_blank" rel="noreferrer" className="btn btn-outline btn-sm">
                     <Paperclip size={14} /> {detail.attachment.name || 'Download attachment'}
                   </a>
                 </div>

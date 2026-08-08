@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
-import api from '../../api';
+import api, { assetUrl } from '../../api';
 import { useToast } from '../../components/Toast';
 
 export default function MarkAttendance() {
@@ -194,7 +194,7 @@ export default function MarkAttendance() {
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                           {r.avatar ? (
-                            <img src={r.avatar} alt="" className="avatar" style={{ width: 32, height: 32 }} />
+                            <img src={assetUrl(r.avatar)} alt="" className="avatar" style={{ width: 32, height: 32 }} />
                           ) : (
                             <div className="avatar" style={{ width: 32, height: 32, fontSize: '0.7rem' }}>
                               {r.name
