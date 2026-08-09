@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, FileBarChart } from 'lucide-react';
 import api from '../../api';
-import { formatDate } from '../../utils';
+import { formatDate, formatTime } from '../../utils';
 
 export default function AttendanceReport() {
   const navigate = useNavigate();
@@ -15,7 +15,7 @@ export default function AttendanceReport() {
     return d.toISOString().slice(0, 10);
   });
   const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
-  const [tab, setTab] = useState('summary');
+  const [tab, setTab] = useState('detail');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -86,7 +86,7 @@ export default function AttendanceReport() {
         </select>
         <select
           className="form-control"
-          style={{ maxWidth: 220 }}
+          style={{ maxWidth: 240 }}
           value={batchId}
           onChange={(e) => setBatchId(e.target.value)}
           disabled={course === 'all' || shiftsForCourse.length === 0}
@@ -117,19 +117,21 @@ export default function AttendanceReport() {
             <div className="stat-label">Absent</div>
             <div className="stat-value">{data.totals.absent}</div>
           </div>
-          <div className="stat-card" style={{ '--accent-color': '#0284c7', '--icon-bg': '#e0f2fe' }}>
-            <div className="stat-label">Students</div>
-            <div className="stat-value">{data.summary.length}</div>
+          <div className="stat-card" style={{ '--accent-color': '#b91c1c', '--icon-bg': '#fee2e2' }}>
+            <div className="stat-label">Late</div>
+            <div className="stat-value" style={{ color: 'var(--danger)' }}>
+              {data.totals.late ?? 0}
+            </div>
           </div>
         </div>
       )}
 
       <div className="role-tabs" style={{ maxWidth: 320, marginBottom: '1rem' }}>
-        <button type="button" className={`role-tab ${tab === 'summary' ? 'active' : ''}`} onClick={() => setTab('summary')}>
-          Student Summary
-        </button>
         <button type="button" className={`role-tab ${tab === 'detail' ? 'active' : ''}`} onClick={() => setTab('detail')}>
           Day-wise Detail
+        </button>
+        <button type="button" className={`role-tab ${tab === 'summary' ? 'active' : ''}`} onClick={() => setTab('summary')}>
+          Student Summary
         </button>
       </div>
 
@@ -147,6 +149,7 @@ export default function AttendanceReport() {
                     <th>Student</th>
                     <th>Course</th>
                     <th>Present</th>
+                    <th>Late</th>
                     <th>Absent</th>
                     <th>Total</th>
                     <th>%</th>
@@ -155,7 +158,7 @@ export default function AttendanceReport() {
                 <tbody>
                   {data.summary.length === 0 ? (
                     <tr>
-                      <td colSpan={6} style={{ textAlign: 'center', color: 'var(--ink-muted)' }}>
+                      <td colSpan={7} style={{ textAlign: 'center', color: 'var(--ink-muted)' }}>
                         No attendance records in this range
                       </td>
                     </tr>
@@ -168,8 +171,12 @@ export default function AttendanceReport() {
                         </td>
                         <td>
                           <span className="badge badge-info">{s.student.course}</span>
+                          {s.student.batch && (
+                            <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>{s.student.batch}</div>
+                          )}
                         </td>
                         <td style={{ color: 'var(--success)', fontWeight: 600 }}>{s.present}</td>
+                        <td style={{ color: 'var(--danger)', fontWeight: 600 }}>{s.late || 0}</td>
                         <td style={{ color: 'var(--danger)', fontWeight: 600 }}>{s.absent}</td>
                         <td>{s.total}</td>
                         <td>
@@ -189,8 +196,10 @@ export default function AttendanceReport() {
                 <thead>
                   <tr>
                     <th>Date</th>
+                    <th>Time</th>
                     <th>Student</th>
                     <th>Course</th>
+                    <th>Batch</th>
                     <th>Status</th>
                     <th>Marked By</th>
                   </tr>
@@ -198,28 +207,46 @@ export default function AttendanceReport() {
                 <tbody>
                   {data.records.length === 0 ? (
                     <tr>
-                      <td colSpan={5} style={{ textAlign: 'center', color: 'var(--ink-muted)' }}>
+                      <td colSpan={7} style={{ textAlign: 'center', color: 'var(--ink-muted)' }}>
                         No records found
                       </td>
                     </tr>
                   ) : (
-                    data.records.map((r) => (
-                      <tr key={r._id}>
-                        <td>{formatDate(r.date)}</td>
-                        <td>
-                          <strong>{r.student?.name || '—'}</strong>
-                        </td>
-                        <td>
-                          <span className="badge badge-info">{r.course}</span>
-                        </td>
-                        <td>
-                          <span className={`badge ${r.status === 'P' ? 'badge-success' : 'badge-danger'}`}>
-                            {r.status === 'P' ? 'Present' : 'Absent'}
-                          </span>
-                        </td>
-                        <td>{r.markedBy?.name || '—'}</td>
-                      </tr>
-                    ))
+                    data.records.map((r) => {
+                      const time = formatTime(r.markedAt);
+                      const late = !!r.isLate;
+                      return (
+                        <tr key={r._id} style={late ? { background: 'rgba(220, 38, 38, 0.06)' } : undefined}>
+                          <td>{formatDate(r.date)}</td>
+                          <td style={{ whiteSpace: 'nowrap' }}>
+                            <span style={{ color: late ? 'var(--danger)' : undefined, fontWeight: late ? 700 : 400 }}>
+                              {time}
+                            </span>
+                            {late && (
+                              <span className="badge badge-danger" style={{ marginLeft: 6, fontSize: '0.7rem' }}>
+                                Late
+                              </span>
+                            )}
+                            {r.startTime && (
+                              <div style={{ fontSize: '0.7rem', color: 'var(--ink-muted)' }}>Start {r.startTime}</div>
+                            )}
+                          </td>
+                          <td>
+                            <strong>{r.student?.name || '—'}</strong>
+                          </td>
+                          <td>
+                            <span className="badge badge-info">{r.course}</span>
+                          </td>
+                          <td style={{ fontSize: '0.85rem' }}>{r.batch || r.student?.batch || '—'}</td>
+                          <td>
+                            <span className={`badge ${r.status === 'P' ? 'badge-success' : 'badge-danger'}`}>
+                              {r.status === 'P' ? 'Present' : 'Absent'}
+                            </span>
+                          </td>
+                          <td>{r.markedByName || '—'}</td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>

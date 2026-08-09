@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import api from '../../../api';
 import { useToast } from '../../../components/Toast';
+import { formatTime } from '../../../utils';
 
 export default function MarkEmpAttendance() {
   const toast = useToast();
@@ -39,6 +40,7 @@ export default function MarkEmpAttendance() {
           empCode: r.employee.employeeId,
           status: r.status || '',
           remark: r.remark || '',
+          markedAt: r.markedAt || null,
         }))
       );
       setMeta(data.data);
@@ -78,7 +80,11 @@ export default function MarkEmpAttendance() {
           remark: r.remark,
         })),
       });
-      toast.success(data.message || 'Attendance saved');
+      toast.success(
+        data.markedAt
+          ? `${data.message || 'Attendance saved'} at ${formatTime(data.markedAt)}`
+          : data.message || 'Attendance saved'
+      );
       loadSheet();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to save attendance');
@@ -162,6 +168,7 @@ export default function MarkEmpAttendance() {
                     <th>ID</th>
                     <th>Department</th>
                     <th>Designation</th>
+                    <th>Marked At</th>
                     <th style={{ textAlign: 'center' }}>Present (P)</th>
                     <th style={{ textAlign: 'center' }}>Absent (A)</th>
                   </tr>
@@ -192,6 +199,9 @@ export default function MarkEmpAttendance() {
                         <span className="badge badge-info">{r.department}</span>
                       </td>
                       <td>{r.designation || '—'}</td>
+                      <td style={{ fontSize: '0.85rem', color: 'var(--ink-muted)', whiteSpace: 'nowrap' }}>
+                        {r.markedAt ? formatTime(r.markedAt) : '—'}
+                      </td>
                       <td style={{ textAlign: 'center' }}>
                         <button type="button" className={`attn-btn ${r.status === 'P' ? 'attn-p active' : ''}`} onClick={() => setStatus(r.employeeId, 'P')}>
                           P

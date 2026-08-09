@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CalendarCheck } from 'lucide-react';
 import api from '../../api';
-import { formatDate } from '../../utils';
+import { formatDate, formatTime } from '../../utils';
 
 export default function StudentAttendance() {
   const now = new Date();
@@ -83,14 +83,16 @@ export default function StudentAttendance() {
                 <thead>
                   <tr>
                     <th>Date</th>
+                    <th>Time</th>
                     <th>Class</th>
+                    <th>Batch</th>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.records.length === 0 ? (
                     <tr>
-                      <td colSpan={3} style={{ textAlign: 'center', color: 'var(--ink-muted)' }}>
+                      <td colSpan={5} style={{ textAlign: 'center', color: 'var(--ink-muted)' }}>
                         No attendance marked for this month yet
                       </td>
                     </tr>
@@ -98,9 +100,11 @@ export default function StudentAttendance() {
                     data.records.map((r) => (
                       <tr key={r._id}>
                         <td>{formatDate(r.date)}</td>
+                        <td style={{ whiteSpace: 'nowrap' }}>{formatTime(r.markedAt)}</td>
                         <td>
                           <span className="badge badge-info">{r.course}</span>
                         </td>
+                        <td style={{ fontSize: '0.85rem' }}>{r.batch || '—'}</td>
                         <td>
                           <span className={`badge ${r.status === 'P' ? 'badge-success' : 'badge-danger'}`}>
                             {r.status === 'P' ? 'Present (P)' : 'Absent (A)'}

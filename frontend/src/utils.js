@@ -5,3 +5,14 @@ export const formatDate = (d) => {
   if (!d) return '—';
   return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 };
+
+/** Clock time when attendance was marked, e.g. 02:45 pm */
+export const formatTime = (d) => {
+  if (!d) return '—';
+  return new Date(d).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+};
+
+export const formatDateTime = (d) => {
+  if (!d) return '—';
+  return `${formatDate(d)}, ${formatTime(d)}`;
+};

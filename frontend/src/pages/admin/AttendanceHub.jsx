@@ -7,7 +7,7 @@ export default function AttendanceHub() {
   const options = [
     {
       title: 'Mark Attendance',
-      desc: 'Select class/course and mark Present (P) or Absent (A) for students',
+      desc: 'Select class + batch/shift, then mark Present (P) or Absent (A)',
       icon: ClipboardCheck,
       color: '#0f766e',
       bg: '#ccfbf1',
@@ -15,7 +15,7 @@ export default function AttendanceHub() {
     },
     {
       title: 'Attendance Report',
-      desc: 'View class-wise attendance history, summary and percentages',
+      desc: 'Batch-wise report with mark time — late entries shown in red',
       icon: FileBarChart,
       color: '#c45c26',
       bg: '#fef3ee',

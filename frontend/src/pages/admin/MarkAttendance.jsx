@@ -4,6 +4,7 @@ import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import api, { assetUrl } from '../../api';
 import { useToast } from '../../components/Toast';
 import { useAuth } from '../../context/AuthContext';
+import { formatTime } from '../../utils';
 
 export default function MarkAttendance() {
   const toast = useToast();
@@ -67,6 +68,7 @@ export default function MarkAttendance() {
           avatar: r.student.avatar,
           status: r.status || '',
           remark: r.remark || '',
+          markedAt: r.markedAt || null,
         }))
       );
       setMeta(data.data);
@@ -119,7 +121,11 @@ export default function MarkAttendance() {
         if (shift) payload.batch = shift.batchName;
       }
       const { data } = await api.post('/attendance/admin/mark', payload);
-      toast.success(data.message || 'Attendance saved');
+      toast.success(
+        data.markedAt
+          ? `${data.message || 'Attendance saved'} at ${formatTime(data.markedAt)}`
+          : data.message || 'Attendance saved'
+      );
       loadSheet();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to save attendance');
@@ -176,7 +182,7 @@ export default function MarkAttendance() {
                 </div>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label>
-                    Batch / Shift {needsBatch && <span className="req">*</span>}
+                    Batch / Shift to mark {needsBatch && <span className="req">*</span>}
                   </label>
                   <select
                     className="form-control"
@@ -184,7 +190,13 @@ export default function MarkAttendance() {
                     onChange={(e) => setBatchId(e.target.value)}
                     disabled={!course || courseHasNoShifts}
                   >
-                    <option value="">{courseHasNoShifts ? 'No shifts (whole class)' : 'Select batch'}</option>
+                    <option value="">
+                      {!course
+                        ? 'Select class first'
+                        : courseHasNoShifts
+                          ? 'No shifts (whole class)'
+                          : 'Select batch to mark'}
+                    </option>
                     {shiftsForCourse.map((b) => (
                       <option key={String(b.batchId)} value={b.batchId}>
                         {b.batchName}
@@ -192,6 +204,11 @@ export default function MarkAttendance() {
                       </option>
                     ))}
                   </select>
+                  {needsBatch && !batchId && course && (
+                    <p style={{ fontSize: '0.75rem', color: 'var(--danger)', marginTop: 4 }}>
+                      Select which batch you are marking now
+                    </p>
+                  )}
                 </div>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label>
@@ -246,11 +263,12 @@ export default function MarkAttendance() {
                     <thead>
                       <tr>
                         <th style={{ width: 48 }}>#</th>
-                        <th>Student</th>
-                        <th>Phone</th>
-                        <th>Batch</th>
-                        <th style={{ textAlign: 'center' }}>Present (P)</th>
-                        <th style={{ textAlign: 'center' }}>Absent (A)</th>
+                    <th>Student</th>
+                    <th>Phone</th>
+                    <th>Batch</th>
+                    <th>Marked At</th>
+                    <th style={{ textAlign: 'center' }}>Present (P)</th>
+                    <th style={{ textAlign: 'center' }}>Absent (A)</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -273,9 +291,12 @@ export default function MarkAttendance() {
                               <strong>{r.name}</strong>
                             </div>
                           </td>
-                          <td>{r.phone}</td>
-                          <td>{r.batch || '—'}</td>
-                          <td style={{ textAlign: 'center' }}>
+                      <td>{r.phone}</td>
+                      <td>{r.batch || '—'}</td>
+                      <td style={{ fontSize: '0.85rem', color: 'var(--ink-muted)', whiteSpace: 'nowrap' }}>
+                        {r.markedAt ? formatTime(r.markedAt) : '—'}
+                      </td>
+                      <td style={{ textAlign: 'center' }}>
                             <button
                               type="button"
                               className={`attn-btn ${r.status === 'P' ? 'attn-p active' : ''}`}

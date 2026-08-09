@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, FileBarChart } from 'lucide-react';
 import api from '../../../api';
-import { formatDate } from '../../../utils';
+import { formatDate, formatTime } from '../../../utils';
 import { useToast } from '../../../components/Toast';
 
 export default function EmpAttendanceReport() {
@@ -158,6 +158,7 @@ export default function EmpAttendanceReport() {
                 <thead>
                   <tr>
                     <th>Date</th>
+                    <th>Time</th>
                     <th>Employee</th>
                     <th>Department</th>
                     <th>Status</th>
@@ -167,7 +168,7 @@ export default function EmpAttendanceReport() {
                 <tbody>
                   {data.records.length === 0 ? (
                     <tr>
-                      <td colSpan={5} style={{ textAlign: 'center', color: 'var(--ink-muted)' }}>
+                      <td colSpan={6} style={{ textAlign: 'center', color: 'var(--ink-muted)' }}>
                         No records found
                       </td>
                     </tr>
@@ -175,6 +176,7 @@ export default function EmpAttendanceReport() {
                     data.records.map((r) => (
                       <tr key={r._id}>
                         <td>{formatDate(r.date)}</td>
+                        <td style={{ whiteSpace: 'nowrap' }}>{formatTime(r.markedAt)}</td>
                         <td>
                           <strong>{r.employee?.name || '—'}</strong>
                         </td>
