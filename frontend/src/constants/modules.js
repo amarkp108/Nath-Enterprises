@@ -57,6 +57,16 @@ export const MODULES = [
       { key: 'delete', label: 'Delete' },
     ],
   },
+  {
+    key: 'results',
+    label: 'Publish Results',
+    actions: [
+      { key: 'view', label: 'View' },
+      { key: 'create', label: 'Publish' },
+      { key: 'edit', label: 'Edit' },
+      { key: 'delete', label: 'Delete' },
+    ],
+  },
 ];
 
 export const emptyPermissions = () => {
@@ -83,6 +93,7 @@ const STAFF_HOME_ORDER = [
   { path: '/admin/attendance', module: 'attendance' },
   { path: '/admin/leaves', module: 'leaves' },
   { path: '/admin/homework', module: 'homework' },
+  { path: '/admin/results', module: 'results' },
   { path: '/admin/courses', module: 'courses' },
 ];
 

@@ -25,6 +25,7 @@ app.use('/api/hrm', require('./routes/hrm'));
 app.use('/api/homework', require('./routes/homework'));
 app.use('/api/leave', require('./routes/leave'));
 app.use('/api/settings', require('./routes/settings'));
+app.use('/api/results', require('./routes/results'));
 
 app.get('/api/health', (req, res) => {
   res.json({ success: true, message: 'Nath Enterprises API is running' });

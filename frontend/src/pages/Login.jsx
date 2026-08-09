@@ -152,7 +152,7 @@ export default function Login() {
 
           {loginRole === 'admin' && (
             <p style={{ marginTop: '1.25rem', fontSize: '0.78rem', color: 'var(--ink-muted)', textAlign: 'center' }}>
-              Default: admin@nathenterprises.com / Admin@123
+            
             </p>
           )}
           {loginRole === 'employee' && (

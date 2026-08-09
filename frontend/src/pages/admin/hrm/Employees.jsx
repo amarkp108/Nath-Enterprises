@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Search, Pencil, Trash2, X, Loader2, Users, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Plus, Search, Pencil, Trash2, X, Loader2, Users, ShieldCheck, Layers } from 'lucide-react';
 import api from '../../../api';
 import { formatCurrency, formatDate } from '../../../utils';
 import { useToast } from '../../../components/Toast';
@@ -35,12 +35,26 @@ export default function Employees() {
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
 
+  const [courseOptions, setCourseOptions] = useState([]);
+  const [batchEmployee, setBatchEmployee] = useState(null);
+  const [selectedBatches, setSelectedBatches] = useState([]);
+  const [savingBatches, setSavingBatches] = useState(false);
+
   const loadDeptOptions = async () => {
     try {
       const { data } = await api.get('/settings/departments?active=true');
       setDeptOptions((data.data || []).map((d) => d.name));
     } catch {
-      /* ignore — filter chips still work from employee list */
+      /* ignore */
+    }
+  };
+
+  const loadCourses = async () => {
+    try {
+      const { data } = await api.get('/admin/courses');
+      setCourseOptions((data.data || []).filter((c) => c.isActive !== false));
+    } catch {
+      /* ignore */
     }
   };
 
@@ -62,6 +76,7 @@ export default function Employees() {
 
   useEffect(() => {
     loadDeptOptions();
+    loadCourses();
   }, []);
 
   useEffect(() => {
@@ -95,6 +110,63 @@ export default function Employees() {
     setShowModal(true);
   };
 
+  const openAssignBatches = (e) => {
+    loadCourses();
+    setBatchEmployee(e);
+    setSelectedBatches(
+      (e.assignedBatches || []).map((b) => ({
+        courseId: b.courseId,
+        courseName: b.courseName,
+        batchId: b.batchId,
+        batchName: b.batchName,
+        startTime: b.startTime || '',
+        endTime: b.endTime || '',
+      }))
+    );
+  };
+
+  const isBatchSelected = (courseId, batchId) =>
+    selectedBatches.some((b) => String(b.courseId) === String(courseId) && String(b.batchId) === String(batchId));
+
+  const toggleBatch = (course, shift) => {
+    setSelectedBatches((prev) => {
+      const exists = prev.some(
+        (b) => String(b.courseId) === String(course._id) && String(b.batchId) === String(shift._id)
+      );
+      if (exists) {
+        return prev.filter(
+          (b) => !(String(b.courseId) === String(course._id) && String(b.batchId) === String(shift._id))
+        );
+      }
+      return [
+        ...prev,
+        {
+          courseId: course._id,
+          courseName: course.name,
+          batchId: shift._id,
+          batchName: shift.name,
+          startTime: shift.startTime || '',
+          endTime: shift.endTime || '',
+        },
+      ];
+    });
+  };
+
+  const handleSaveBatches = async () => {
+    if (!batchEmployee) return;
+    setSavingBatches(true);
+    try {
+      await api.put(`/hrm/employees/${batchEmployee._id}`, { assignedBatches: selectedBatches });
+      toast.success('Batches assigned successfully');
+      setBatchEmployee(null);
+      fetch();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to save batches');
+    } finally {
+      setSavingBatches(false);
+    }
+  };
+
   const handleSave = async (ev) => {
     ev.preventDefault();
     if (!form.name || !form.phone || !form.department) {
@@ -118,7 +190,7 @@ export default function Employees() {
         toast.success('Employee updated successfully');
       } else {
         await api.post('/hrm/employees', payload);
-        toast.success('Employee added — set module permissions from Settings');
+        toast.success('Employee added — use Assign Batches to set attendance shifts');
       }
       setShowModal(false);
       fetch();
@@ -142,6 +214,7 @@ export default function Employees() {
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const allDepts = [...new Set([...deptOptions, ...departments])].filter(Boolean).sort();
+  const hasAnyShifts = courseOptions.some((c) => (c.shifts || []).some((s) => s.isActive !== false));
 
   return (
     <>
@@ -201,6 +274,7 @@ export default function Employees() {
                   <th>Employee</th>
                   <th>Phone</th>
                   <th>Department</th>
+                  <th>Batches</th>
                   <th>Designation</th>
                   <th>Salary</th>
                   <th>Joined</th>
@@ -233,6 +307,15 @@ export default function Employees() {
                     <td>
                       <span className="badge badge-info">{e.department}</span>
                     </td>
+                    <td style={{ fontSize: '0.8rem' }}>
+                      {(e.assignedBatches || []).length === 0 ? (
+                        <span style={{ color: 'var(--ink-muted)' }}>—</span>
+                      ) : (
+                        <span title={(e.assignedBatches || []).map((b) => `${b.courseName}: ${b.batchName}`).join(', ')}>
+                          {e.assignedBatches.length} batch(es)
+                        </span>
+                      )}
+                    </td>
                     <td>{e.designation || '—'}</td>
                     <td style={{ fontWeight: 600 }}>{formatCurrency(e.salary)}</td>
                     <td>{formatDate(e.joinDate)}</td>
@@ -246,9 +329,16 @@ export default function Employees() {
                         </button>
                         <button
                           className="btn btn-sm btn-ghost"
+                          title="Assign Batches"
+                          onClick={() => openAssignBatches(e)}
+                          style={{ color: 'var(--brand)' }}
+                        >
+                          <Layers size={16} />
+                        </button>
+                        <button
+                          className="btn btn-sm btn-ghost"
                           title="Permissions"
                           onClick={() => navigate('/admin/settings/permissions')}
-                          style={{ color: 'var(--brand)' }}
                         >
                           <ShieldCheck size={16} />
                         </button>
@@ -265,6 +355,7 @@ export default function Employees() {
         )}
       </div>
 
+      {/* Add / Edit employee — no batches here */}
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal lg" onClick={(e) => e.stopPropagation()}>
@@ -325,11 +416,6 @@ export default function Employees() {
                         </option>
                       ))}
                     </select>
-                    {allDepts.length === 0 && (
-                      <p style={{ fontSize: '0.75rem', color: 'var(--danger)', marginTop: 4 }}>
-                        Add departments in Settings → Department Master first
-                      </p>
-                    )}
                   </div>
                   <div className="form-group">
                     <label>Designation</label>
@@ -390,6 +476,85 @@ export default function Employees() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Separate Assign Batches modal */}
+      {batchEmployee && (
+        <div className="modal-overlay" onClick={() => setBatchEmployee(null)}>
+          <div className="modal lg" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2 style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Layers size={20} /> Assign Batches
+                </h2>
+                <p style={{ fontSize: '0.85rem', color: 'var(--ink-muted)', marginTop: 4 }}>
+                  {batchEmployee.name} · {batchEmployee.employeeId}
+                </p>
+              </div>
+              <button className="btn btn-ghost" onClick={() => setBatchEmployee(null)}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: '0.85rem', color: 'var(--ink-muted)', marginBottom: '1rem' }}>
+                Select course shifts this employee can mark attendance for.
+              </p>
+              {!hasAnyShifts ? (
+                <div className="empty-state" style={{ padding: '1.5rem' }}>
+                  <p>No shifts on any course yet.</p>
+                  <button type="button" className="btn btn-primary" style={{ marginTop: '0.75rem' }} onClick={() => navigate('/admin/courses')}>
+                    Open Course Master
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {courseOptions.map((c) => {
+                    const shifts = (c.shifts || []).filter((s) => s.isActive !== false);
+                    return (
+                      <div key={c._id} style={{ border: '1px solid var(--border)', borderRadius: 'var(--radius-xs)', padding: '0.85rem' }}>
+                        <strong>{c.name}</strong>
+                        {!shifts.length ? (
+                          <p style={{ fontSize: '0.8rem', color: 'var(--ink-muted)', marginTop: 6 }}>No shifts — add in Course Master</p>
+                        ) : (
+                          <div className="filter-chips" style={{ marginTop: 8 }}>
+                            {shifts.map((s) => {
+                              const on = isBatchSelected(c._id, s._id);
+                              return (
+                                <button
+                                  key={s._id}
+                                  type="button"
+                                  className={`chip ${on ? 'active' : ''}`}
+                                  onClick={() => toggleBatch(c, s)}
+                                >
+                                  {s.name}
+                                  {s.startTime || s.endTime ? ` (${s.startTime || '?'}-${s.endTime || '?'})` : ''}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {selectedBatches.length > 0 && (
+                <p style={{ fontSize: '0.85rem', marginTop: '1rem', color: 'var(--brand)', fontWeight: 600 }}>
+                  {selectedBatches.length} batch(es) selected
+                </p>
+              )}
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={() => setBatchEmployee(null)}>
+                Cancel
+              </button>
+              <button type="button" className="btn btn-primary" onClick={handleSaveBatches} disabled={savingBatches || !hasAnyShifts}>
+                {savingBatches && <Loader2 size={16} className="spin" />}
+                Save Batches
+              </button>
+            </div>
           </div>
         </div>
       )}

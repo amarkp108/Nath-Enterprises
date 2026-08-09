@@ -16,6 +16,7 @@ import {
   Briefcase,
   NotebookPen,
   CalendarOff,
+  Award,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { hasPermission } from '../constants/modules';
@@ -28,6 +29,7 @@ const staffLinks = [
   { to: '/admin/attendance', icon: ClipboardCheck, label: 'Attendance', module: 'attendance' },
   { to: '/admin/leaves', icon: CalendarOff, label: 'Leaves', module: 'leaves' },
   { to: '/admin/homework', icon: NotebookPen, label: 'Homework', module: 'homework' },
+  { to: '/admin/results', icon: Award, label: 'Results', module: 'results' },
   { to: '/admin/hrm', icon: Briefcase, label: 'HRM', adminOnly: true },
   { to: '/admin/courses', icon: BookOpen, label: 'Course Master', module: 'courses' },
   { to: '/admin/settings', icon: Settings, label: 'Settings', adminOnly: true },
@@ -39,6 +41,7 @@ const studentLinks = [
   { to: '/student/attendance', icon: ClipboardCheck, label: 'My Attendance' },
   { to: '/student/leave', icon: CalendarOff, label: 'Apply Leave' },
   { to: '/student/homework', icon: NotebookPen, label: 'My Homework' },
+  { to: '/student/results', icon: Award, label: 'My Results' },
   { to: '/student/documents', icon: BookOpen, label: 'Documents' },
 ];
 
@@ -53,6 +56,9 @@ const titles = {
   '/admin/homework': 'Homework',
   '/admin/homework/send': 'Send Homework',
   '/admin/homework/report': 'Homework Sent Report',
+  '/admin/results': 'Results',
+  '/admin/results/publish': 'Publish Result',
+  '/admin/results/list': 'Published Results',
   '/admin/hrm': 'HRM',
   '/admin/hrm/employees': 'Employees',
   '/admin/hrm/attendance/mark': 'Mark Employee Attendance',
@@ -67,6 +73,7 @@ const titles = {
   '/student/attendance': 'My Attendance',
   '/student/leave': 'Apply Leave',
   '/student/homework': 'My Homework',
+  '/student/results': 'My Results',
   '/student/documents': 'My Documents',
   '/student/profile': 'My Profile',
 };

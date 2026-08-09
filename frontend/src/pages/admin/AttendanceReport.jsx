@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, FileBarChart } from 'lucide-react';
 import api from '../../api';
@@ -6,8 +6,9 @@ import { formatDate } from '../../utils';
 
 export default function AttendanceReport() {
   const navigate = useNavigate();
-  const [courses, setCourses] = useState([]);
+  const [batches, setBatches] = useState([]);
   const [course, setCourse] = useState('all');
+  const [batchId, setBatchId] = useState('all');
   const [from, setFrom] = useState(() => {
     const d = new Date();
     d.setDate(1);
@@ -19,25 +20,25 @@ export default function AttendanceReport() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    api.get('/admin/courses').then((res) => setCourses(res.data.data || []));
-    api.get('/admin/students?limit=500').then((res) => {
-      const fromStudents = [...new Set((res.data.data || []).map((s) => s.course).filter(Boolean))];
-      setCourses((prev) => {
-        const names = new Set(prev.map((c) => c.name));
-        const merged = [...prev];
-        fromStudents.forEach((n) => {
-          if (!names.has(n)) merged.push({ _id: n, name: n });
-        });
-        return merged.sort((a, b) => a.name.localeCompare(b.name));
-      });
-    }).catch(() => {});
+    api
+      .get('/attendance/admin/my-batches')
+      .then((res) => setBatches(res.data.data || []))
+      .catch(() => {});
   }, []);
+
+  const courseNames = useMemo(() => [...new Set(batches.map((b) => b.course))], [batches]);
+
+  const shiftsForCourse = useMemo(() => {
+    if (course === 'all') return [];
+    return batches.filter((b) => b.course === course && b.batchId);
+  }, [batches, course]);
 
   const fetchReport = async () => {
     setLoading(true);
     try {
       const q = new URLSearchParams();
       if (course) q.set('course', course);
+      if (batchId && batchId !== 'all') q.set('batchId', batchId);
       if (from) q.set('from', from);
       if (to) q.set('to', to);
       const { data: res } = await api.get(`/attendance/admin/report?${q}`);
@@ -53,7 +54,7 @@ export default function AttendanceReport() {
   useEffect(() => {
     fetchReport();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [course, from, to]);
+  }, [course, batchId, from, to]);
 
   return (
     <>
@@ -67,11 +68,34 @@ export default function AttendanceReport() {
       </div>
 
       <div className="toolbar">
-        <select className="form-control" style={{ maxWidth: 200 }} value={course} onChange={(e) => setCourse(e.target.value)}>
+        <select
+          className="form-control"
+          style={{ maxWidth: 200 }}
+          value={course}
+          onChange={(e) => {
+            setCourse(e.target.value);
+            setBatchId('all');
+          }}
+        >
           <option value="all">All Classes</option>
-          {courses.map((c) => (
-            <option key={c._id || c.name} value={c.name}>
-              {c.name}
+          {courseNames.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+        <select
+          className="form-control"
+          style={{ maxWidth: 220 }}
+          value={batchId}
+          onChange={(e) => setBatchId(e.target.value)}
+          disabled={course === 'all' || shiftsForCourse.length === 0}
+        >
+          <option value="all">All Batches</option>
+          {shiftsForCourse.map((b) => (
+            <option key={String(b.batchId)} value={b.batchId}>
+              {b.batchName}
+              {b.startTime || b.endTime ? ` (${b.startTime || '?'}-${b.endTime || '?'})` : ''}
             </option>
           ))}
         </select>

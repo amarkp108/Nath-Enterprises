@@ -57,6 +57,16 @@ const MODULES = [
       { key: 'delete', label: 'Delete' },
     ],
   },
+  {
+    key: 'results',
+    label: 'Publish Results',
+    actions: [
+      { key: 'view', label: 'View' },
+      { key: 'create', label: 'Publish' },
+      { key: 'edit', label: 'Edit' },
+      { key: 'delete', label: 'Delete' },
+    ],
+  },
 ];
 
 const emptyPermissions = () => {

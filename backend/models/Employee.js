@@ -20,6 +20,16 @@ const employeeSchema = new mongoose.Schema(
     avatar: { type: String, default: '' },
     notes: { type: String, default: '' },
     permissions: { type: mongoose.Schema.Types.Mixed, default: emptyPermissions },
+    assignedBatches: [
+      {
+        courseId: { type: mongoose.Schema.Types.ObjectId, ref: 'Course' },
+        courseName: { type: String, default: '' },
+        batchId: { type: mongoose.Schema.Types.ObjectId },
+        batchName: { type: String, default: '' },
+        startTime: { type: String, default: '' },
+        endTime: { type: String, default: '' },
+      },
+    ],
     role: { type: String, default: 'employee' },
   },
   { timestamps: true }

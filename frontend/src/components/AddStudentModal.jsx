@@ -19,6 +19,7 @@ const empty = {
   dateOfBirth: '',
   gender: '',
   batch: '',
+  batchId: '',
   notes: '',
   admissionDate: new Date().toISOString().slice(0, 10),
 };
@@ -48,6 +49,7 @@ export default function AddStudentModal({ onClose, onSuccess, student }) {
         dateOfBirth: student.dateOfBirth ? student.dateOfBirth.slice(0, 10) : '',
         gender: student.gender || '',
         batch: student.batch || '',
+        batchId: student.batchId ? String(student.batchId) : '',
         notes: student.notes || '',
         admissionDate: student.admissionDate ? student.admissionDate.slice(0, 10) : '',
         status: student.status || 'Active',
@@ -56,6 +58,9 @@ export default function AddStudentModal({ onClose, onSuccess, student }) {
   }, [student]);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const selectedCourse = courses.find((c) => c.name === form.course);
+  const courseShifts = (selectedCourse?.shifts || []).filter((s) => s.isActive !== false);
 
   const onAvatarChange = (e) => {
     const file = e.target.files?.[0];
@@ -88,6 +93,10 @@ export default function AddStudentModal({ onClose, onSuccess, student }) {
 
     if (!form.name || !form.phone || !form.course || form.totalFee === '') {
       toast.warning('Name, phone, course and fee are required');
+      return;
+    }
+    if (courseShifts.length > 0 && !form.batchId) {
+      toast.warning('Please select a batch/shift for this course');
       return;
     }
     if (!isEdit && !form.password) {
@@ -181,9 +190,15 @@ export default function AddStudentModal({ onClose, onSuccess, student }) {
                   className="form-control"
                   value={form.course}
                   onChange={(e) => {
-                    set('course', e.target.value);
-                    const c = courses.find((x) => x.name === e.target.value);
-                    if (c && !isEdit) set('totalFee', c.defaultFee);
+                    const name = e.target.value;
+                    const c = courses.find((x) => x.name === name);
+                    setForm((f) => ({
+                      ...f,
+                      course: name,
+                      batchId: '',
+                      batch: '',
+                      totalFee: !isEdit && c ? c.defaultFee : f.totalFee,
+                    }));
                   }}
                   required
                 >
@@ -209,8 +224,37 @@ export default function AddStudentModal({ onClose, onSuccess, student }) {
                 />
               </div>
               <div className="form-group">
-                <label>Batch</label>
-                <input className="form-control" value={form.batch} onChange={(e) => set('batch', e.target.value)} placeholder="e.g. Morning A" />
+                <label>
+                  Batch / Shift {courseShifts.length > 0 && <span className="req">*</span>}
+                </label>
+                {courseShifts.length > 0 ? (
+                  <select
+                    className="form-control"
+                    value={form.batchId}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      const shift = courseShifts.find((s) => String(s._id) === id);
+                      setForm((f) => ({ ...f, batchId: id, batch: shift?.name || '' }));
+                    }}
+                    required
+                  >
+                    <option value="">Select batch</option>
+                    {courseShifts.map((s) => (
+                      <option key={s._id} value={s._id}>
+                        {s.name}
+                        {s.startTime || s.endTime ? ` (${s.startTime || '?'}-${s.endTime || '?'})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    className="form-control"
+                    value={form.batch}
+                    onChange={(e) => set('batch', e.target.value)}
+                    placeholder={form.course ? 'No shifts — add in Course Master' : 'Select course first'}
+                    disabled={!form.course}
+                  />
+                )}
               </div>
             </div>
 

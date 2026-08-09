@@ -184,7 +184,7 @@ router.post('/students', requirePerm('students', 'create'), (req, res) => {
       return res.status(400).json({ success: false, message: msg });
     }
     try {
-      const { name, phone, password, course, totalFee, email, address, fatherName, motherName, dateOfBirth, gender, batch, notes, admissionDate } = req.body;
+      const { name, phone, password, course, totalFee, email, address, fatherName, motherName, dateOfBirth, gender, batch, batchId, notes, admissionDate } = req.body;
 
       if (!name || !phone || !password || !course || totalFee === undefined || totalFee === '') {
         return res.status(400).json({ success: false, message: 'Name, phone, password, course and fee are required' });
@@ -193,6 +193,12 @@ router.post('/students', requirePerm('students', 'create'), (req, res) => {
       const exists = await Student.findOne({ phone: phone.trim() });
       if (exists) {
         return res.status(400).json({ success: false, message: 'Student with this phone number already exists' });
+      }
+
+      const { resolveStudentBatch } = require('../utils/batches');
+      const resolved = await resolveStudentBatch(course, batchId || null, batch || '');
+      if (resolved.error) {
+        return res.status(400).json({ success: false, message: resolved.error });
       }
 
       const avatarFile = req.files?.avatar?.[0];
@@ -217,7 +223,8 @@ router.post('/students', requirePerm('students', 'create'), (req, res) => {
         motherName: motherName || '',
         dateOfBirth: dateOfBirth || undefined,
         gender: gender || '',
-        batch: batch || '',
+        batch: resolved.batch || '',
+        batchId: resolved.batchId || null,
         notes: notes || '',
         admissionDate: admissionDate || Date.now(),
         documents,
@@ -248,12 +255,24 @@ router.put('/students/:id', requirePerm('students', 'edit'), (req, res) => {
       const student = await Student.findById(req.params.id);
       if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
 
-      const fields = ['name', 'phone', 'email', 'course', 'totalFee', 'address', 'fatherName', 'motherName', 'dateOfBirth', 'gender', 'batch', 'notes', 'status', 'admissionDate'];
+      const fields = ['name', 'phone', 'email', 'course', 'totalFee', 'address', 'fatherName', 'motherName', 'dateOfBirth', 'gender', 'notes', 'status', 'admissionDate'];
       fields.forEach((f) => {
         if (req.body[f] !== undefined && req.body[f] !== '') {
           student[f] = f === 'totalFee' ? Number(req.body[f]) : req.body[f];
         }
       });
+
+      if (req.body.course !== undefined || req.body.batchId !== undefined || req.body.batch !== undefined) {
+        const { resolveStudentBatch } = require('../utils/batches');
+        const courseName = req.body.course !== undefined && req.body.course !== '' ? req.body.course : student.course;
+        const resolved = await resolveStudentBatch(courseName, req.body.batchId || null, req.body.batch || '');
+        if (resolved.error) {
+          return res.status(400).json({ success: false, message: resolved.error });
+        }
+        student.course = courseName;
+        student.batch = resolved.batch || '';
+        student.batchId = resolved.batchId || null;
+      }
 
       if (req.body.password && req.body.password.length >= 6) {
         student.password = req.body.password;
@@ -384,16 +403,18 @@ router.get('/courses', requirePerm('courses', 'view'), async (req, res) => {
 
 router.post('/courses', requirePerm('courses', 'create'), async (req, res) => {
   try {
-    const { name, description, defaultFee, duration, isActive } = req.body;
+    const { name, description, defaultFee, duration, isActive, shifts } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Course name is required' });
     const exists = await Course.findOne({ name: name.trim() });
     if (exists) return res.status(400).json({ success: false, message: 'Course with this name already exists' });
+    const { normalizeShifts } = require('../utils/batches');
     const course = await Course.create({
       name: name.trim(),
       description,
       defaultFee: Number(defaultFee) || 0,
       duration,
       isActive: isActive !== false && isActive !== 'false',
+      shifts: normalizeShifts(shifts) || [],
     });
     res.status(201).json({ success: true, data: course, message: 'Course added successfully' });
   } catch (error) {
@@ -403,10 +424,11 @@ router.post('/courses', requirePerm('courses', 'create'), async (req, res) => {
 
 router.put('/courses/:id', requirePerm('courses', 'edit'), async (req, res) => {
   try {
-    const { name, description, defaultFee, duration, isActive } = req.body;
+    const { name, description, defaultFee, duration, isActive, shifts } = req.body;
     const course = await Course.findById(req.params.id);
     if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
 
+    const oldName = course.name;
     if (name && name.trim() !== course.name) {
       const exists = await Course.findOne({ name: name.trim(), _id: { $ne: course._id } });
       if (exists) return res.status(400).json({ success: false, message: 'Course with this name already exists' });
@@ -417,7 +439,76 @@ router.put('/courses/:id', requirePerm('courses', 'edit'), async (req, res) => {
     if (duration !== undefined) course.duration = duration;
     if (isActive !== undefined) course.isActive = isActive === true || isActive === 'true';
 
+    if (Array.isArray(shifts)) {
+      const { normalizeShifts } = require('../utils/batches');
+      const Employee = require('../models/Employee');
+      const incoming = normalizeShifts(shifts);
+      const oldIds = new Set((course.shifts || []).map((s) => String(s._id)));
+      const newIds = new Set(incoming.filter((s) => s._id).map((s) => String(s._id)));
+      const removedIds = [...oldIds].filter((id) => !newIds.has(id));
+
+      for (const rid of removedIds) {
+        const inUse = await Student.countDocuments({ batchId: rid });
+        if (inUse > 0) {
+          const shift = course.shifts.id(rid);
+          return res.status(400).json({
+            success: false,
+            message: `Cannot remove shift "${shift?.name || rid}" — ${inUse} student(s) assigned. Reassign them first.`,
+          });
+        }
+      }
+
+      // Apply shifts (preserve ids where provided)
+      course.shifts = incoming;
+
+      await course.save();
+
+      // Sync renamed shift names on students & employees
+      for (const shift of course.shifts) {
+        await Student.updateMany({ batchId: shift._id }, { $set: { batch: shift.name } });
+        await Employee.updateMany(
+          { 'assignedBatches.batchId': shift._id },
+          {
+            $set: {
+              'assignedBatches.$[elem].batchName': shift.name,
+              'assignedBatches.$[elem].courseName': course.name,
+              'assignedBatches.$[elem].startTime': shift.startTime || '',
+              'assignedBatches.$[elem].endTime': shift.endTime || '',
+            },
+          },
+          { arrayFilters: [{ 'elem.batchId': shift._id }] }
+        );
+      }
+
+      // Remove employee assignments for deleted shifts
+      if (removedIds.length) {
+        await Employee.updateMany({}, { $pull: { assignedBatches: { batchId: { $in: removedIds } } } });
+      }
+
+      if (oldName !== course.name) {
+        await Student.updateMany({ course: oldName }, { $set: { course: course.name } });
+        await Employee.updateMany(
+          { 'assignedBatches.courseId': course._id },
+          { $set: { 'assignedBatches.$[elem].courseName': course.name } },
+          { arrayFilters: [{ 'elem.courseId': course._id }] }
+        );
+      }
+
+      return res.json({ success: true, data: course, message: 'Course updated successfully' });
+    }
+
     await course.save();
+
+    if (oldName !== course.name) {
+      await Student.updateMany({ course: oldName }, { $set: { course: course.name } });
+      const Employee = require('../models/Employee');
+      await Employee.updateMany(
+        { 'assignedBatches.courseId': course._id },
+        { $set: { 'assignedBatches.$[elem].courseName': course.name } },
+        { arrayFilters: [{ 'elem.courseId': course._id }] }
+      );
+    }
+
     res.json({ success: true, data: course, message: 'Course updated successfully' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

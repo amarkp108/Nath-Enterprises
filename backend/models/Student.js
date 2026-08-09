@@ -27,6 +27,7 @@ const studentSchema = new mongoose.Schema(
     avatar: { type: String, default: '' },
     notes: { type: String, default: '' },
     batch: { type: String, default: '' },
+    batchId: { type: mongoose.Schema.Types.ObjectId, default: null },
     role: { type: String, default: 'student' },
   },
   { timestamps: true }

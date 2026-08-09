@@ -19,6 +19,9 @@ import HomeworkHub from './pages/admin/homework/HomeworkHub';
 import SendHomework from './pages/admin/homework/SendHomework';
 import HomeworkReport from './pages/admin/homework/HomeworkReport';
 import AdminLeaves from './pages/admin/Leaves';
+import ResultsHub from './pages/admin/results/ResultsHub';
+import PublishResult from './pages/admin/results/PublishResult';
+import ResultsList from './pages/admin/results/ResultsList';
 import SettingsHub from './pages/admin/settings/SettingsHub';
 import Departments from './pages/admin/settings/Departments';
 import EmployeePermissions from './pages/admin/settings/EmployeePermissions';
@@ -29,6 +32,7 @@ import StudentAttendance from './pages/student/Attendance';
 import StudentHomework from './pages/student/Homework';
 import StudentLeave from './pages/student/Leave';
 import StudentDocuments from './pages/student/Documents';
+import StudentResults from './pages/student/Results';
 import { hasPermission, firstStaffPath } from './constants/modules';
 
 const homeFor = (role, user) => {
@@ -201,6 +205,30 @@ function AppRoutes() {
           }
         />
         <Route
+          path="results"
+          element={
+            <RequirePerm module="results">
+              <ResultsHub />
+            </RequirePerm>
+          }
+        />
+        <Route
+          path="results/publish"
+          element={
+            <RequirePerm module="results">
+              <PublishResult />
+            </RequirePerm>
+          }
+        />
+        <Route
+          path="results/list"
+          element={
+            <RequirePerm module="results">
+              <ResultsList />
+            </RequirePerm>
+          }
+        />
+        <Route
           path="courses"
           element={
             <RequirePerm module="courses">
@@ -247,6 +275,7 @@ function AppRoutes() {
         <Route path="attendance" element={<StudentAttendance />} />
         <Route path="leave" element={<StudentLeave />} />
         <Route path="homework" element={<StudentHomework />} />
+        <Route path="results" element={<StudentResults />} />
         <Route path="documents" element={<StudentDocuments />} />
         <Route path="profile" element={<Profile />} />
       </Route>

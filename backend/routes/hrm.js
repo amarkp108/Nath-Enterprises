@@ -2,6 +2,7 @@ const express = require('express');
 const Employee = require('../models/Employee');
 const EmployeeAttendance = require('../models/EmployeeAttendance');
 const { protect, adminOnly } = require('../middleware/auth');
+const { resolveAssignedBatches } = require('../utils/batches');
 
 const router = express.Router();
 router.use(protect, adminOnly);
@@ -59,7 +60,7 @@ router.get('/employees/:id', async (req, res) => {
 
 router.post('/employees', async (req, res) => {
   try {
-    const { name, phone, email, password, department, designation, salary, joinDate, address, gender, dateOfBirth, notes, status, permissions } = req.body;
+    const { name, phone, email, password, department, designation, salary, joinDate, address, gender, dateOfBirth, notes, status, permissions, assignedBatches } = req.body;
     if (!name || !phone || !department || !password) {
       return res.status(400).json({ success: false, message: 'Name, phone, department and password are required' });
     }
@@ -71,6 +72,8 @@ router.post('/employees', async (req, res) => {
     if (exists) {
       return res.status(400).json({ success: false, message: 'Employee with this phone already exists' });
     }
+
+    const batches = await resolveAssignedBatches(assignedBatches || []);
 
     const employee = await Employee.create({
       name,
@@ -87,6 +90,7 @@ router.post('/employees', async (req, res) => {
       notes: notes || '',
       status: status || 'Active',
       permissions: permissions || undefined,
+      assignedBatches: batches,
     });
 
     res.status(201).json({ success: true, data: employee, message: 'Employee added successfully' });
@@ -113,6 +117,10 @@ router.put('/employees/:id', async (req, res) => {
 
     if (req.body.permissions && typeof req.body.permissions === 'object') {
       employee.permissions = req.body.permissions;
+    }
+
+    if (req.body.assignedBatches !== undefined) {
+      employee.assignedBatches = await resolveAssignedBatches(req.body.assignedBatches || []);
     }
 
     if (req.body.phone) {
