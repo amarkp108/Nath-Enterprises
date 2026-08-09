@@ -71,9 +71,42 @@ const employeeHasBatch = (user, courseName, batchId) => {
   );
 };
 
+/** Compare marked clock time vs batch startTime "HH:mm" — true if after start */
+const isAttendanceLate = (markedAt, startTime) => {
+  if (!markedAt || !startTime) return false;
+  const parts = String(startTime).split(':');
+  if (parts.length < 2) return false;
+  const h = Number(parts[0]);
+  const m = Number(parts[1]);
+  if (Number.isNaN(h) || Number.isNaN(m)) return false;
+  const marked = new Date(markedAt);
+  const start = new Date(marked);
+  start.setHours(h, m, 0, 0);
+  return marked.getTime() > start.getTime();
+};
+
+/** Build map batchId -> { startTime, endTime, name, course } from courses */
+const buildShiftTimeMap = async () => {
+  const courses = await Course.find({}).select('name shifts');
+  const map = {};
+  courses.forEach((c) => {
+    (c.shifts || []).forEach((s) => {
+      map[String(s._id)] = {
+        startTime: s.startTime || '',
+        endTime: s.endTime || '',
+        batchName: s.name,
+        course: c.name,
+      };
+    });
+  });
+  return map;
+};
+
 module.exports = {
   normalizeShifts,
   resolveStudentBatch,
   resolveAssignedBatches,
   employeeHasBatch,
+  isAttendanceLate,
+  buildShiftTimeMap,
 };

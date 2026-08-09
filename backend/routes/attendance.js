@@ -3,7 +3,7 @@ const Attendance = require('../models/Attendance');
 const Student = require('../models/Student');
 const Course = require('../models/Course');
 const { protect, adminOrEmployee, requirePerm, studentOnly } = require('../middleware/auth');
-const { employeeHasBatch } = require('../utils/batches');
+const { employeeHasBatch, isAttendanceLate, buildShiftTimeMap } = require('../utils/batches');
 
 const router = express.Router();
 
@@ -127,6 +127,7 @@ router.get('/admin/sheet', protect, adminOrEmployee, requirePerm('attendance', '
       student: s,
       status: map[s._id.toString()]?.status || '',
       remark: map[s._id.toString()]?.remark || '',
+      markedAt: map[s._id.toString()]?.markedAt || null,
       attendanceId: map[s._id.toString()]?._id || null,
     }));
 
@@ -193,6 +194,7 @@ router.post('/admin/mark', protect, adminOrEmployee, requirePerm('attendance', '
     const allowedIds = new Set((await Student.find(studentFilter).select('_id')).map((s) => String(s._id)));
 
     const day = startOfDay(date);
+    const now = new Date();
     let saved = 0;
 
     for (const rec of records) {
@@ -209,6 +211,7 @@ router.post('/admin/mark', protect, adminOrEmployee, requirePerm('attendance', '
           date: day,
           status: rec.status,
           remark: rec.remark || '',
+          markedAt: now,
           markedBy: req.user._id,
         },
         { upsert: true, new: true, setDefaultsOnInsert: true }
@@ -216,7 +219,12 @@ router.post('/admin/mark', protect, adminOrEmployee, requirePerm('attendance', '
       saved += 1;
     }
 
-    res.json({ success: true, message: `Attendance saved for ${saved} student(s)`, saved });
+    res.json({
+      success: true,
+      message: `Attendance saved for ${saved} student(s)`,
+      saved,
+      markedAt: now,
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -251,8 +259,41 @@ router.get('/admin/report', protect, adminOrEmployee, requirePerm('attendance', 
       .populate('student', 'name phone course batch batchId avatar')
       .sort({ date: -1, 'student.name': 1 });
 
+    // Resolve marker names (admin or employee)
+    const Admin = require('../models/Admin');
+    const Employee = require('../models/Employee');
+    const markerIds = [...new Set(records.map((r) => r.markedBy).filter(Boolean).map(String))];
+    const [admins, employees] = await Promise.all([
+      Admin.find({ _id: { $in: markerIds } }).select('name'),
+      Employee.find({ _id: { $in: markerIds } }).select('name'),
+    ]);
+    const markerNames = {};
+    admins.forEach((a) => {
+      markerNames[String(a._id)] = a.name;
+    });
+    employees.forEach((e) => {
+      markerNames[String(e._id)] = e.name;
+    });
+
+    const shiftMap = await buildShiftTimeMap();
+
+    const enriched = records.map((r) => {
+      const obj = r.toObject({ virtuals: true });
+      const markedAt = obj.markedAt || obj.updatedAt || obj.createdAt || null;
+      const shift = obj.batchId ? shiftMap[String(obj.batchId)] : null;
+      const startTime = shift?.startTime || '';
+      const late = obj.status === 'P' && isAttendanceLate(markedAt, startTime);
+      return {
+        ...obj,
+        markedAt,
+        startTime,
+        isLate: late,
+        markedByName: obj.markedBy ? markerNames[String(obj.markedBy)] || '—' : '—',
+      };
+    });
+
     const summaryMap = {};
-    records.forEach((r) => {
+    enriched.forEach((r) => {
       if (!r.student) return;
       const id = r.student._id.toString();
       if (!summaryMap[id]) {
@@ -260,12 +301,15 @@ router.get('/admin/report', protect, adminOrEmployee, requirePerm('attendance', 
           student: r.student,
           present: 0,
           absent: 0,
+          late: 0,
           total: 0,
         };
       }
       summaryMap[id].total += 1;
-      if (r.status === 'P') summaryMap[id].present += 1;
-      else summaryMap[id].absent += 1;
+      if (r.status === 'P') {
+        summaryMap[id].present += 1;
+        if (r.isLate) summaryMap[id].late += 1;
+      } else summaryMap[id].absent += 1;
     });
 
     const summary = Object.values(summaryMap).map((s) => ({
@@ -274,14 +318,15 @@ router.get('/admin/report', protect, adminOrEmployee, requirePerm('attendance', 
     }));
 
     const totals = {
-      present: records.filter((r) => r.status === 'P').length,
-      absent: records.filter((r) => r.status === 'A').length,
-      total: records.length,
+      present: enriched.filter((r) => r.status === 'P').length,
+      absent: enriched.filter((r) => r.status === 'A').length,
+      late: enriched.filter((r) => r.isLate).length,
+      total: enriched.length,
     };
 
     res.json({
       success: true,
-      data: { records, summary, totals },
+      data: { records: enriched, summary, totals },
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

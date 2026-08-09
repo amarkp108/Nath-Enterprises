@@ -174,6 +174,7 @@ router.get('/attendance/sheet', async (req, res) => {
       employee: e,
       status: map[e._id.toString()]?.status || '',
       remark: map[e._id.toString()]?.remark || '',
+      markedAt: map[e._id.toString()]?.markedAt || null,
       attendanceId: map[e._id.toString()]?._id || null,
     }));
 
@@ -203,6 +204,7 @@ router.post('/attendance/mark', async (req, res) => {
     }
 
     const day = startOfDay(date);
+    const now = new Date();
     let saved = 0;
 
     for (const rec of records) {
@@ -218,6 +220,7 @@ router.post('/attendance/mark', async (req, res) => {
           date: day,
           status: rec.status,
           remark: rec.remark || '',
+          markedAt: now,
           markedBy: req.user._id,
         },
         { upsert: true, new: true, setDefaultsOnInsert: true }
@@ -225,7 +228,12 @@ router.post('/attendance/mark', async (req, res) => {
       saved += 1;
     }
 
-    res.json({ success: true, message: `Attendance saved for ${saved} employee(s)`, saved });
+    res.json({
+      success: true,
+      message: `Attendance saved for ${saved} employee(s)`,
+      saved,
+      markedAt: now,
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

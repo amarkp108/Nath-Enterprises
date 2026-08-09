@@ -9,6 +9,7 @@ const attendanceSchema = new mongoose.Schema(
     date: { type: Date, required: true },
     status: { type: String, enum: ['P', 'A'], required: true },
     remark: { type: String, default: '' },
+    markedAt: { type: Date },
     markedBy: { type: mongoose.Schema.Types.ObjectId },
   },
   { timestamps: true }
