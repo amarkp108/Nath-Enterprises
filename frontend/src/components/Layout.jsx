@@ -133,7 +133,7 @@ export default function Layout() {
       <aside className={`sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-brand">
           <div className="logo-mark">N</div>
-          <h1>Nath Enterprises</h1>
+          <h1>Nath classes</h1>
           <p>{role === 'admin' ? 'Admin Panel' : role === 'employee' ? 'Staff Portal' : 'Student Portal'}</p>
         </div>
 

@@ -45,7 +45,7 @@ export default function Login() {
       <div className="login-hero">
         <div className="login-hero-content">
           <div className="brand-mark">N</div>
-          <h1>Nath Enterprises</h1>
+          <h1>Nath Classes</h1>
           <p className="tagline">
             Manage admissions, fees, and students — all in one place. Built for modern coaching institutes.
           </p>
