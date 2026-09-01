@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, IndianRupee, Pencil, Trash2, FileText } from 'lucide-react';
+import { ArrowLeft, IndianRupee, Pencil, Trash2, FileText, Printer } from 'lucide-react';
 import api, { assetUrl } from '../../api';
 import { formatCurrency, formatDate } from '../../utils';
 import AddStudentModal from '../../components/AddStudentModal';
 import CollectFeeModal from '../../components/CollectFeeModal';
 import { useToast } from '../../components/Toast';
+import { printFeeReceipt } from '../../utils/printFeeReceipt';
 
 export default function StudentDetail() {
   const toast = useToast();
@@ -215,12 +216,13 @@ export default function StudentDetail() {
                 <th>Mode</th>
                 <th>Date</th>
                 <th>Remark</th>
+                <th style={{ width: 80 }}></th>
               </tr>
             </thead>
             <tbody>
               {payments.length === 0 ? (
                 <tr>
-                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--ink-muted)' }}>
+                  <td colSpan={6} style={{ textAlign: 'center', color: 'var(--ink-muted)' }}>
                     No payments yet
                   </td>
                 </tr>
@@ -236,6 +238,18 @@ export default function StudentDetail() {
                     </td>
                     <td>{formatDate(p.paymentDate)}</td>
                     <td>{p.remark || '—'}</td>
+                    <td>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        title="Print receipt"
+                        onClick={() => {
+                          const receipt = { ...p, student };
+                          if (!printFeeReceipt(receipt)) toast.warning('Please allow pop-ups to print');
+                        }}
+                      >
+                        <Printer size={15} />
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}

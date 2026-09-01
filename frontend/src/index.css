@@ -1357,3 +1357,164 @@ tr.clickable:hover td {
     display: none;
   }
 }
+
+/* Fee Receipt */
+.fee-receipt-modal {
+  max-width: 520px;
+}
+
+.fee-receipt-modal-body {
+  padding: 0 !important;
+  background: var(--bg);
+}
+
+.fee-receipt {
+  border: 2px solid var(--brand);
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.fee-receipt-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: linear-gradient(135deg, var(--brand-light), var(--brand));
+  color: #fff;
+  text-align: center;
+  padding: 1.5rem 1rem;
+}
+
+.fee-receipt-head h2 {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: linear-gradient(90deg, #fde68a, #fbbf24);
+  padding: 0.45rem 1.25rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.fee-receipt-head p {
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-top: 0.65rem;
+  padding: 0.3rem 1rem;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--brand);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.fee-receipt-title {
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 0.65rem;
+  border-bottom: 1px dashed var(--border);
+  background: var(--bg);
+}
+
+.fee-receipt-meta {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  font-size: 0.75rem;
+  border-bottom: 1px dashed var(--border);
+}
+
+.fee-receipt-meta span {
+  color: var(--ink-muted);
+  display: block;
+}
+
+.fee-receipt-meta strong {
+  font-size: 0.85rem;
+  margin-top: 2px;
+}
+
+.fee-receipt-section {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px dashed var(--border);
+}
+
+.fee-receipt-section h4 {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--ink-muted);
+  margin-bottom: 0.5rem;
+}
+
+.fee-receipt-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  margin-bottom: 0.25rem;
+  gap: 1rem;
+}
+
+.fee-receipt-row span:last-child {
+  text-align: right;
+  font-weight: 500;
+}
+
+.fee-receipt-amount {
+  background: var(--brand-subtle);
+  padding: 1rem;
+  text-align: center;
+  border-bottom: 1px dashed var(--border);
+}
+
+.fee-receipt-amount-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--ink-muted);
+}
+
+.fee-receipt-amount-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--brand);
+  margin: 0.25rem 0;
+}
+
+.fee-receipt-amount-words {
+  font-size: 0.75rem;
+  color: var(--ink-soft);
+  font-style: italic;
+}
+
+.fee-receipt-balance span:last-child {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.fee-receipt-balance.cleared span:last-child {
+  color: var(--success);
+}
+
+.fee-receipt-footer {
+  padding: 1rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--ink-muted);
+}
+
+.fee-receipt-sign {
+  margin-top: 1.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}

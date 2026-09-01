@@ -334,13 +334,17 @@ router.post('/fees', requirePerm('fees', 'create'), async (req, res) => {
       paymentMode: paymentMode || 'Cash',
       remark: remark || '',
       collectedBy: req.user._id,
+      collectedByName: req.user?.name || '',
       paymentDate: paymentDate || Date.now(),
     });
 
     student.paidFee += Number(amount);
     await student.save();
 
-    const populated = await FeePayment.findById(payment._id).populate('student', 'name phone course');
+    const populated = await FeePayment.findById(payment._id).populate(
+      'student',
+      'name phone course batch fatherName totalFee paidFee'
+    );
     res.status(201).json({ success: true, data: populated, message: 'Fee collected successfully' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -365,8 +369,7 @@ router.get('/fees', requirePerm('fees', 'view'), async (req, res) => {
 
     const total = await FeePayment.countDocuments(filter);
     const payments = await FeePayment.find(filter)
-      .populate('student', 'name phone course')
-      .populate('collectedBy', 'name')
+      .populate('student', 'name phone course batch fatherName totalFee paidFee')
       .sort({ paymentDate: -1 })
       .skip((Number(page) - 1) * Number(limit))
       .limit(Number(limit));

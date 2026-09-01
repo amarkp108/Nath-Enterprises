@@ -3,6 +3,7 @@ import { X, Loader2 } from 'lucide-react';
 import api from '../api';
 import { formatCurrency } from '../utils';
 import { useToast } from './Toast';
+import FeeReceiptModal from './FeeReceiptModal';
 
 export default function CollectFeeModal({ student, onClose, onSuccess }) {
   const toast = useToast();
@@ -14,6 +15,7 @@ export default function CollectFeeModal({ student, onClose, onSuccess }) {
     paymentDate: new Date().toISOString().slice(0, 10),
   });
   const [loading, setLoading] = useState(false);
+  const [receipt, setReceipt] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,7 +29,7 @@ export default function CollectFeeModal({ student, onClose, onSuccess }) {
     }
     setLoading(true);
     try {
-      await api.post('/admin/fees', {
+      const { data } = await api.post('/admin/fees', {
         studentId: student._id,
         amount: Number(form.amount),
         paymentMode: form.paymentMode,
@@ -35,13 +37,22 @@ export default function CollectFeeModal({ student, onClose, onSuccess }) {
         paymentDate: form.paymentDate,
       });
       toast.success('Fee collected successfully');
-      onSuccess();
+      setReceipt(data.data);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to collect fee');
     } finally {
       setLoading(false);
     }
   };
+
+  const handleReceiptClose = () => {
+    setReceipt(null);
+    onSuccess();
+  };
+
+  if (receipt) {
+    return <FeeReceiptModal payment={receipt} onClose={handleReceiptClose} />;
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>

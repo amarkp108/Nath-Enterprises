@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { IndianRupee, Plus, X, Loader2 } from 'lucide-react';
+import { IndianRupee, Plus, X, Loader2, Printer } from 'lucide-react';
 import api from '../../api';
 import { formatCurrency, formatDate } from '../../utils';
 import { useToast } from '../../components/Toast';
+import FeeReceiptModal from '../../components/FeeReceiptModal';
+import { printFeeReceipt } from '../../utils/printFeeReceipt';
 
 export default function Fees() {
   const toast = useToast();
@@ -20,6 +22,7 @@ export default function Fees() {
     paymentDate: new Date().toISOString().slice(0, 10),
   });
   const [saving, setSaving] = useState(false);
+  const [receipt, setReceipt] = useState(null);
 
   const loadStudents = () =>
     api.get('/admin/students?limit=200').then((res) => {
@@ -85,7 +88,7 @@ export default function Fees() {
     }
     setSaving(true);
     try {
-      await api.post('/admin/fees', {
+      const { data } = await api.post('/admin/fees', {
         studentId: form.studentId,
         amount: Number(form.amount),
         paymentMode: form.paymentMode,
@@ -94,6 +97,7 @@ export default function Fees() {
       });
       toast.success('Fee collected successfully');
       setShowCollect(false);
+      setReceipt(data.data);
       fetchPayments();
       loadStudents();
     } catch (err) {
@@ -137,12 +141,13 @@ export default function Fees() {
                   <th>Mode</th>
                   <th>Date</th>
                   <th>Remark</th>
+                  <th style={{ width: 80 }}></th>
                 </tr>
               </thead>
               <tbody>
                 {payments.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', color: 'var(--ink-muted)' }}>
+                    <td colSpan={8} style={{ textAlign: 'center', color: 'var(--ink-muted)' }}>
                       No payments found
                     </td>
                   </tr>
@@ -165,6 +170,17 @@ export default function Fees() {
                       </td>
                       <td>{formatDate(p.paymentDate)}</td>
                       <td>{p.remark || '—'}</td>
+                      <td>
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          title="Print receipt"
+                          onClick={() => {
+                            if (!printFeeReceipt(p)) toast.warning('Please allow pop-ups to print');
+                          }}
+                        >
+                          <Printer size={15} />
+                        </button>
+                      </td>
                     </tr>
                   ))
                 )}
@@ -253,6 +269,13 @@ export default function Fees() {
             </form>
           </div>
         </div>
+      )}
+
+      {receipt && (
+        <FeeReceiptModal
+          payment={receipt}
+          onClose={() => setReceipt(null)}
+        />
       )}
     </>
   );
