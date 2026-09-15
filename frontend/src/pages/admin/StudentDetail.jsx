@@ -91,14 +91,22 @@ export default function StudentDetail() {
                 <span className="badge badge-info">{student.course}</span>
                 <span className={`badge ${student.status === 'Active' ? 'badge-success' : 'badge-muted'}`}>{student.status}</span>
                 {student.batch && <span className="badge badge-muted">{student.batch}</span>}
+                <span className={`badge ${student.feeType === 'monthly' ? 'badge-warning' : 'badge-muted'}`}>
+                  {student.feeType === 'monthly' ? 'Monthly Fee' : 'One Time Fee'}
+                </span>
               </div>
             </div>
           </div>
 
           <div className="fee-summary">
             <div className="fee-box">
-              <div className="label">Total Fee</div>
+              <div className="label">{student.feeType === 'monthly' ? 'Total Due' : 'Total Fee'}</div>
               <div className="value">{formatCurrency(student.totalFee)}</div>
+              {student.feeType === 'monthly' && student.monthlyFee > 0 && (
+                <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)', marginTop: 4 }}>
+                  ₹{student.monthlyFee}/month
+                </div>
+              )}
             </div>
             <div className="fee-box paid">
               <div className="label">Paid</div>

@@ -84,9 +84,9 @@ export default function EmpAttendanceReport() {
             <div className="stat-label">Absent</div>
             <div className="stat-value">{data.totals.absent}</div>
           </div>
-          <div className="stat-card" style={{ '--accent-color': '#0284c7', '--icon-bg': '#e0f2fe' }}>
-            <div className="stat-label">Employees</div>
-            <div className="stat-value">{data.summary.length}</div>
+          <div className="stat-card" style={{ '--accent-color': '#d97706', '--icon-bg': '#fef3c7' }}>
+            <div className="stat-label">Late</div>
+            <div className="stat-value">{data.totals.late || 0}</div>
           </div>
         </div>
       )}
@@ -115,6 +115,7 @@ export default function EmpAttendanceReport() {
                     <th>Department</th>
                     <th>Present</th>
                     <th>Absent</th>
+                    <th>Late</th>
                     <th>Total</th>
                     <th>%</th>
                   </tr>
@@ -122,7 +123,7 @@ export default function EmpAttendanceReport() {
                 <tbody>
                   {data.summary.length === 0 ? (
                     <tr>
-                      <td colSpan={6} style={{ textAlign: 'center', color: 'var(--ink-muted)' }}>
+                      <td colSpan={7} style={{ textAlign: 'center', color: 'var(--ink-muted)' }}>
                         No attendance records in this range
                       </td>
                     </tr>
@@ -140,6 +141,7 @@ export default function EmpAttendanceReport() {
                         </td>
                         <td style={{ color: 'var(--success)', fontWeight: 600 }}>{s.present}</td>
                         <td style={{ color: 'var(--danger)', fontWeight: 600 }}>{s.absent}</td>
+                        <td style={{ color: 'var(--warning)', fontWeight: 600 }}>{s.late || 0}</td>
                         <td>{s.total}</td>
                         <td>
                           <span className={`badge ${s.percent >= 75 ? 'badge-success' : s.percent >= 50 ? 'badge-warning' : 'badge-danger'}`}>
@@ -160,7 +162,7 @@ export default function EmpAttendanceReport() {
                     <th>Date</th>
                     <th>Time</th>
                     <th>Employee</th>
-                    <th>Department</th>
+                    <th>Batch</th>
                     <th>Status</th>
                     <th>Marked By</th>
                   </tr>
@@ -174,18 +176,32 @@ export default function EmpAttendanceReport() {
                     </tr>
                   ) : (
                     data.records.map((r) => (
-                      <tr key={r._id}>
+                      <tr key={r._id} style={r.isLate ? { background: 'var(--danger-soft)' } : undefined}>
                         <td>{formatDate(r.date)}</td>
-                        <td style={{ whiteSpace: 'nowrap' }}>{formatTime(r.markedAt)}</td>
+                        <td style={{ whiteSpace: 'nowrap', color: r.isLate ? 'var(--danger)' : undefined, fontWeight: r.isLate ? 700 : undefined }}>
+                          {formatTime(r.markedAt)}
+                          {r.isLate ? ' · Late' : ''}
+                        </td>
                         <td>
                           <strong>{r.employee?.name || '—'}</strong>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>{r.department}</div>
+                        </td>
+                        <td style={{ fontSize: '0.85rem' }}>
+                          {r.batchName ? (
+                            <>
+                              {r.courseName ? `${r.courseName}: ` : ''}
+                              {r.batchName}
+                              {r.startTime ? (
+                                <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>Start {r.startTime}</div>
+                              ) : null}
+                            </>
+                          ) : (
+                            '—'
+                          )}
                         </td>
                         <td>
-                          <span className="badge badge-info">{r.department}</span>
-                        </td>
-                        <td>
-                          <span className={`badge ${r.status === 'P' ? 'badge-success' : 'badge-danger'}`}>
-                            {r.status === 'P' ? 'Present' : 'Absent'}
+                          <span className={`badge ${r.status === 'P' ? (r.isLate ? 'badge-warning' : 'badge-success') : 'badge-danger'}`}>
+                            {r.status === 'P' ? (r.isLate ? 'Late' : 'Present') : 'Absent'}
                           </span>
                         </td>
                         <td>{r.markedBy?.name || '—'}</td>

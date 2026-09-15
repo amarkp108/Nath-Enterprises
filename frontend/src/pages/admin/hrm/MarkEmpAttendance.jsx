@@ -1,16 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import api from '../../../api';
 import { useToast } from '../../../components/Toast';
 import { formatTime } from '../../../utils';
 
+const nowLocal = () => {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
 export default function MarkEmpAttendance() {
   const toast = useToast();
   const navigate = useNavigate();
   const [departments, setDepartments] = useState([]);
   const [department, setDepartment] = useState('all');
+  const [batchFilter, setBatchFilter] = useState('all');
+  const [batches, setBatches] = useState([]);
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [markTime, setMarkTime] = useState(nowLocal);
   const [sheet, setSheet] = useState([]);
   const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -29,7 +38,9 @@ export default function MarkEmpAttendance() {
     try {
       const q = new URLSearchParams({ date });
       if (department) q.set('department', department);
+      if (batchFilter && batchFilter !== 'all') q.set('batchId', batchFilter);
       const { data } = await api.get(`/hrm/attendance/sheet?${q}`);
+      setBatches(data.data.batches || []);
       setSheet(
         data.data.sheet.map((r) => ({
           employeeId: r.employee._id,
@@ -41,6 +52,8 @@ export default function MarkEmpAttendance() {
           status: r.status || '',
           remark: r.remark || '',
           markedAt: r.markedAt || null,
+          batchId: r.batchId ? String(r.batchId) : '',
+          assignedBatches: r.assignedBatches || [],
         }))
       );
       setMeta(data.data);
@@ -56,10 +69,14 @@ export default function MarkEmpAttendance() {
   useEffect(() => {
     if (date) loadSheet();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [department, date]);
+  }, [department, date, batchFilter]);
 
   const setStatus = (employeeId, status) => {
     setSheet((rows) => rows.map((r) => (r.employeeId === employeeId ? { ...r, status } : r)));
+  };
+
+  const setBatch = (employeeId, batchId) => {
+    setSheet((rows) => rows.map((r) => (r.employeeId === employeeId ? { ...r, batchId } : r)));
   };
 
   const markAll = (status) => setSheet((rows) => rows.map((r) => ({ ...r, status })));
@@ -70,14 +87,22 @@ export default function MarkEmpAttendance() {
       toast.warning('Mark at least one employee as P or A');
       return;
     }
+    for (const r of records) {
+      if ((r.assignedBatches || []).length > 0 && !r.batchId) {
+        toast.warning(`Select a batch for ${r.name}`);
+        return;
+      }
+    }
     setSaving(true);
     try {
       const { data } = await api.post('/hrm/attendance/mark', {
         date,
+        markedAt: markTime ? new Date(markTime).toISOString() : undefined,
         records: records.map((r) => ({
           employeeId: r.employeeId,
           status: r.status,
           remark: r.remark,
+          batchId: r.batchId || undefined,
         })),
       });
       toast.success(
@@ -96,6 +121,8 @@ export default function MarkEmpAttendance() {
   const presentCount = sheet.filter((r) => r.status === 'P').length;
   const absentCount = sheet.filter((r) => r.status === 'A').length;
 
+  const batchOptions = useMemo(() => batches, [batches]);
+
   return (
     <>
       <div className="toolbar">
@@ -107,7 +134,7 @@ export default function MarkEmpAttendance() {
 
       <div className="card" style={{ marginBottom: '1.25rem' }}>
         <div className="card-body">
-          <div className="form-row" style={{ marginBottom: 0 }}>
+          <div className="form-row" style={{ marginBottom: '0.85rem' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label>Department</label>
               <select className="form-control" value={department} onChange={(e) => setDepartment(e.target.value)}>
@@ -120,10 +147,35 @@ export default function MarkEmpAttendance() {
               </select>
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>Batch filter</label>
+              <select className="form-control" value={batchFilter} onChange={(e) => setBatchFilter(e.target.value)}>
+                <option value="all">All Batches</option>
+                {batchOptions.map((b) => (
+                  <option key={String(b.batchId)} value={String(b.batchId)}>
+                    {b.courseName}: {b.batchName}
+                    {b.startTime ? ` (${b.startTime})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="form-row" style={{ marginBottom: 0 }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
               <label>
                 Date <span className="req">*</span>
               </label>
               <input className="form-control" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label>
+                Marked At (date & time) <span className="req">*</span>
+              </label>
+              <input
+                className="form-control"
+                type="datetime-local"
+                value={markTime}
+                onChange={(e) => setMarkTime(e.target.value)}
+              />
             </div>
           </div>
         </div>
@@ -133,7 +185,7 @@ export default function MarkEmpAttendance() {
         <div className="spinner" />
       ) : sheet.length === 0 ? (
         <div className="card">
-          <div className="empty-state">No active employees found. Add employees first from HRM → Employees.</div>
+          <div className="empty-state">No active employees found for this filter.</div>
         </div>
       ) : (
         <>
@@ -165,9 +217,8 @@ export default function MarkEmpAttendance() {
                   <tr>
                     <th style={{ width: 48 }}>#</th>
                     <th>Employee</th>
-                    <th>ID</th>
                     <th>Department</th>
-                    <th>Designation</th>
+                    <th>Batch</th>
                     <th>Marked At</th>
                     <th style={{ textAlign: 'center' }}>Present (P)</th>
                     <th style={{ textAlign: 'center' }}>Absent (A)</th>
@@ -188,17 +239,35 @@ export default function MarkEmpAttendance() {
                           </div>
                           <div>
                             <strong>{r.name}</strong>
-                            <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>{r.phone}</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>
+                              {r.empCode} · {r.phone}
+                            </div>
                           </div>
                         </div>
                       </td>
                       <td>
-                        <code style={{ fontSize: '0.8rem' }}>{r.empCode}</code>
-                      </td>
-                      <td>
                         <span className="badge badge-info">{r.department}</span>
                       </td>
-                      <td>{r.designation || '—'}</td>
+                      <td style={{ minWidth: 180 }}>
+                        {(r.assignedBatches || []).length === 0 ? (
+                          <span style={{ color: 'var(--ink-muted)', fontSize: '0.85rem' }}>—</span>
+                        ) : (
+                          <select
+                            className="form-control"
+                            style={{ fontSize: '0.85rem', padding: '0.35rem 0.5rem' }}
+                            value={r.batchId}
+                            onChange={(e) => setBatch(r.employeeId, e.target.value)}
+                          >
+                            <option value="">Select batch</option>
+                            {r.assignedBatches.map((b) => (
+                              <option key={String(b.batchId)} value={String(b.batchId)}>
+                                {b.courseName}: {b.batchName}
+                                {b.startTime ? ` (${b.startTime})` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </td>
                       <td style={{ fontSize: '0.85rem', color: 'var(--ink-muted)', whiteSpace: 'nowrap' }}>
                         {r.markedAt ? formatTime(r.markedAt) : '—'}
                       </td>

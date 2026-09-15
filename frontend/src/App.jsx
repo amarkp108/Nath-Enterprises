@@ -15,6 +15,7 @@ import HrmHub from './pages/admin/hrm/HrmHub';
 import Employees from './pages/admin/hrm/Employees';
 import MarkEmpAttendance from './pages/admin/hrm/MarkEmpAttendance';
 import EmpAttendanceReport from './pages/admin/hrm/EmpAttendanceReport';
+import MyEmpAttendance from './pages/admin/hrm/MyEmpAttendance';
 import HomeworkHub from './pages/admin/homework/HomeworkHub';
 import SendHomework from './pages/admin/homework/SendHomework';
 import HomeworkReport from './pages/admin/homework/HomeworkReport';
@@ -61,6 +62,12 @@ function Protected({ children, allowedRole }) {
 function AdminOnly({ children }) {
   const { role } = useAuth();
   if (role !== 'admin') return <Navigate to="/admin" replace />;
+  return children;
+}
+
+function EmployeeOnly({ children }) {
+  const { role, user } = useAuth();
+  if (role !== 'employee') return <Navigate to={homeFor(role, user)} replace />;
   return children;
 }
 
@@ -138,6 +145,14 @@ function AppRoutes() {
             <RequirePerm module="attendance">
               <AttendanceReport />
             </RequirePerm>
+          }
+        />
+        <Route
+          path="my-attendance"
+          element={
+            <EmployeeOnly>
+              <MyEmpAttendance />
+            </EmployeeOnly>
           }
         />
         <Route

@@ -5,7 +5,7 @@ import { formatCurrency } from '../../utils';
 import { useToast } from '../../components/Toast';
 
 const emptyShift = () => ({ name: '', startTime: '', endTime: '', isActive: true });
-const emptyForm = { name: '', description: '', defaultFee: '', duration: '', isActive: true, shifts: [] };
+const emptyForm = { name: '', description: '', defaultFee: '', feeType: 'one_time', duration: '', isActive: true, shifts: [] };
 
 const formatShift = (s) => {
   const time = s.startTime || s.endTime ? `${s.startTime || '?'}-${s.endTime || '?'}` : '';
@@ -35,7 +35,7 @@ export default function Courses() {
 
   const openAdd = () => {
     setEditing(null);
-    setForm({ ...emptyForm, shifts: [emptyShift()] });
+    setForm({ ...emptyForm, feeType: 'one_time', shifts: [emptyShift()] });
     setShowModal(true);
   };
 
@@ -45,6 +45,7 @@ export default function Courses() {
       name: c.name || '',
       description: c.description || '',
       defaultFee: c.defaultFee ?? '',
+      feeType: c.feeType === 'monthly' ? 'monthly' : 'one_time',
       duration: c.duration || '',
       isActive: c.isActive !== false,
       shifts: (c.shifts || []).map((s) => ({
@@ -91,6 +92,7 @@ export default function Courses() {
         name: form.name.trim(),
         description: form.description,
         defaultFee: Number(form.defaultFee) || 0,
+        feeType: form.feeType === 'monthly' ? 'monthly' : 'one_time',
         duration: form.duration,
         isActive: form.isActive,
         shifts,
@@ -155,6 +157,7 @@ export default function Courses() {
               <thead>
                 <tr>
                   <th>Course</th>
+                  <th>Fee Type</th>
                   <th>Shifts / Batches</th>
                   <th>Duration</th>
                   <th>Default Fee</th>
@@ -182,6 +185,11 @@ export default function Courses() {
                             )}
                           </div>
                         </div>
+                      </td>
+                      <td>
+                        <span className={`badge ${c.feeType === 'monthly' ? 'badge-warning' : 'badge-info'}`}>
+                          {c.feeType === 'monthly' ? 'Monthly' : 'One Time'}
+                        </span>
                       </td>
                       <td style={{ fontSize: '0.85rem' }}>
                         {shifts.length === 0 ? (
@@ -233,15 +241,43 @@ export default function Courses() {
             </div>
             <form onSubmit={handleSave}>
               <div className="modal-body">
-                <div className="form-group">
-                  <label>
-                    Course Name <span className="req">*</span>
-                  </label>
-                  <input className="form-control" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>
+                      Course Name <span className="req">*</span>
+                    </label>
+                    <input className="form-control" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+                  </div>
+                  <div className="form-group">
+                    <label>
+                      Fee Type <span className="req">*</span>
+                    </label>
+                    <div className="fee-type-toggle" role="group" aria-label="Fee type">
+                      <button
+                        type="button"
+                        className={`fee-type-btn ${(form.feeType || 'one_time') === 'one_time' ? 'active' : ''}`}
+                        onClick={() => setForm({ ...form, feeType: 'one_time' })}
+                      >
+                        One Time
+                      </button>
+                      <button
+                        type="button"
+                        className={`fee-type-btn ${(form.feeType || 'one_time') === 'monthly' ? 'active' : ''}`}
+                        onClick={() => setForm({ ...form, feeType: 'monthly' })}
+                      >
+                        Monthly
+                      </button>
+                    </div>
+                    <small style={{ color: 'var(--ink-muted)', display: 'block', marginTop: 6 }}>
+                      {(form.feeType || 'one_time') === 'monthly'
+                        ? 'Fee auto-adds every month after admission date'
+                        : 'Single fee amount for the full course'}
+                    </small>
+                  </div>
                 </div>
                 <div className="form-row">
                   <div className="form-group">
-                    <label>Default Fee (₹)</label>
+                    <label>{(form.feeType || 'one_time') === 'monthly' ? 'Monthly Fee (₹)' : 'Default Fee (₹)'}</label>
                     <input
                       className="form-control"
                       type="number"

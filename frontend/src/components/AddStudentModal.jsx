@@ -12,6 +12,7 @@ const empty = {
   password: '',
   course: '',
   totalFee: '',
+  feeType: 'one_time',
   email: '',
   address: '',
   fatherName: '',
@@ -41,7 +42,8 @@ export default function AddStudentModal({ onClose, onSuccess, student }) {
         phone: student.phone || '',
         password: '',
         course: student.course || '',
-        totalFee: student.totalFee ?? '',
+        totalFee: student.feeType === 'monthly' ? (student.monthlyFee ?? student.totalFee ?? '') : (student.totalFee ?? ''),
+        feeType: student.feeType === 'monthly' ? 'monthly' : 'one_time',
         email: student.email || '',
         address: student.address || '',
         fatherName: student.fatherName || '',
@@ -110,6 +112,11 @@ export default function AddStudentModal({ onClose, onSuccess, student }) {
       Object.entries(form).forEach(([k, v]) => {
         if (v !== '' && v !== undefined) fd.append(k, v);
       });
+      const feeType = form.feeType === 'monthly' || selectedCourse?.feeType === 'monthly' ? 'monthly' : 'one_time';
+      fd.set('feeType', feeType);
+      if (feeType === 'monthly') {
+        fd.set('monthlyFee', form.totalFee);
+      }
       files.forEach((f) => fd.append('documents', f));
       if (avatar) fd.append('avatar', avatar);
 
@@ -197,6 +204,7 @@ export default function AddStudentModal({ onClose, onSuccess, student }) {
                       course: name,
                       batchId: '',
                       batch: '',
+                      feeType: c?.feeType === 'monthly' ? 'monthly' : 'one_time',
                       totalFee: !isEdit && c ? c.defaultFee : f.totalFee,
                     }));
                   }}
@@ -212,7 +220,8 @@ export default function AddStudentModal({ onClose, onSuccess, student }) {
               </div>
               <div className="form-group">
                 <label>
-                  Total Fee (₹) <span className="req">*</span>
+                  {form.feeType === 'monthly' || selectedCourse?.feeType === 'monthly' ? 'Monthly Fee (₹)' : 'Total Fee (₹)'}{' '}
+                  <span className="req">*</span>
                 </label>
                 <input
                   className="form-control"
@@ -222,6 +231,11 @@ export default function AddStudentModal({ onClose, onSuccess, student }) {
                   onChange={(e) => set('totalFee', e.target.value)}
                   required
                 />
+                {(form.feeType === 'monthly' || selectedCourse?.feeType === 'monthly') && (
+                  <small style={{ color: 'var(--ink-muted)', display: 'block', marginTop: 4 }}>
+                    Auto-adds every month on the day after admission date
+                  </small>
+                )}
               </div>
               <div className="form-group">
                 <label>

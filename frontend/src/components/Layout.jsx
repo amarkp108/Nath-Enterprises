@@ -17,6 +17,7 @@ import {
   NotebookPen,
   CalendarOff,
   Award,
+  CalendarCheck,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { hasPermission } from '../constants/modules';
@@ -27,6 +28,7 @@ const staffLinks = [
   { to: '/admin/students', icon: Users, label: 'Students', module: 'students' },
   { to: '/admin/fees', icon: IndianRupee, label: 'Fee Collection', module: 'fees' },
   { to: '/admin/attendance', icon: ClipboardCheck, label: 'Attendance', module: 'attendance' },
+  { to: '/admin/my-attendance', icon: CalendarCheck, label: 'My Attendance', employeeOnly: true },
   { to: '/admin/leaves', icon: CalendarOff, label: 'Leaves', module: 'leaves' },
   { to: '/admin/homework', icon: NotebookPen, label: 'Homework', module: 'homework' },
   { to: '/admin/results', icon: Award, label: 'Results', module: 'results' },
@@ -52,6 +54,7 @@ const titles = {
   '/admin/attendance': 'Attendance',
   '/admin/attendance/mark': 'Mark Attendance',
   '/admin/attendance/report': 'Attendance Report',
+  '/admin/my-attendance': 'My Attendance',
   '/admin/leaves': 'Leave Requests',
   '/admin/homework': 'Homework',
   '/admin/homework/send': 'Send Homework',
@@ -93,6 +96,7 @@ export default function Layout() {
     if (role === 'student') return studentLinks;
     return staffLinks.filter((l) => {
       if (l.adminOnly) return role === 'admin';
+      if (l.employeeOnly) return role === 'employee';
       if (role === 'admin') return true;
       return hasPermission(user, role, l.module, 'view');
     });

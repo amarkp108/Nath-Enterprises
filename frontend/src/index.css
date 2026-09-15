@@ -1518,3 +1518,34 @@ tr.clickable:hover td {
   font-size: 0.8rem;
   color: var(--ink-soft);
 }
+
+/* Course fee type toggle */
+.fee-type-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.fee-type-btn {
+  border: 1.5px solid var(--border-strong);
+  background: var(--bg);
+  color: var(--ink-soft);
+  border-radius: var(--radius-xs);
+  padding: 0.65rem 0.75rem;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: 0.15s ease;
+}
+
+.fee-type-btn:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.fee-type-btn.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+  box-shadow: var(--shadow-sm);
+}
