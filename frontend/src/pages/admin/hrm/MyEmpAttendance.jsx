@@ -8,13 +8,18 @@ export default function MyEmpAttendance() {
   const [month, setMonth] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     setLoading(true);
+    setError('');
     api
       .get(`/hrm/attendance/my?month=${month}`)
       .then((res) => setData(res.data.data))
-      .catch(console.error)
+      .catch((err) => {
+        setData(null);
+        setError(err.response?.data?.message || 'Failed to load attendance');
+      })
       .finally(() => setLoading(false));
   }, [month]);
 
@@ -41,8 +46,8 @@ export default function MyEmpAttendance() {
 
       {loading ? (
         <div className="spinner" />
-      ) : !data ? (
-        <div className="empty-state">Failed to load attendance</div>
+      ) : error || !data ? (
+        <div className="empty-state">{error || 'Failed to load attendance'}</div>
       ) : (
         <>
           <div className="stats-grid">

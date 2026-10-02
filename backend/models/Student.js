@@ -14,6 +14,8 @@ const studentSchema = new mongoose.Schema(
     password: { type: String, required: true, minlength: 6 },
     email: { type: String, default: '', trim: true, lowercase: true },
     course: { type: String, required: true, trim: true },
+    feeType: { type: String, enum: ['one_time', 'monthly'], default: 'one_time' },
+    monthlyFee: { type: Number, default: 0, min: 0 },
     totalFee: { type: Number, required: true, min: 0 },
     paidFee: { type: Number, default: 0, min: 0 },
     address: { type: String, default: '' },

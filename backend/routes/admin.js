@@ -4,6 +4,7 @@ const FeePayment = require('../models/FeePayment');
 const Course = require('../models/Course');
 const { protect, adminOrEmployee, requirePerm } = require('../middleware/auth');
 const upload = require('../middleware/upload');
+const { applyMonthlyAccrual, applyMonthlyAccrualMany, monthlyPeriodsDue } = require('../utils/monthlyFee');
 
 const router = express.Router();
 router.use(protect, adminOrEmployee);
@@ -42,12 +43,14 @@ router.get('/dashboard', requirePerm('dashboard', 'view'), async (req, res) => {
         { $match: { paymentDate: { $gte: startOfMonth } } },
         { $group: { _id: null, total: { $sum: '$amount' }, count: { $sum: 1 } } },
       ]),
-      Student.find({ status: 'Active' }).select('name phone course totalFee paidFee'),
+      Student.find({ status: 'Active' }).select('name phone course totalFee paidFee feeType monthlyFee admissionDate'),
       FeePayment.find()
         .populate('student', 'name phone course')
         .sort({ paymentDate: -1 })
         .limit(8),
     ]);
+
+    await applyMonthlyAccrualMany(students);
 
     const pendingStudents = students
       .filter((s) => s.totalFee - s.paidFee > 0)
@@ -136,6 +139,7 @@ router.get('/students', requirePerm('students', 'view'), async (req, res) => {
     }
 
     let students = await Student.find(filter).sort({ createdAt: -1 });
+    await applyMonthlyAccrualMany(students);
 
     if (pending === 'true') {
       students = students.filter((s) => s.totalFee - s.paidFee > 0);
@@ -163,6 +167,7 @@ router.get('/students/:id', requirePerm('students', 'view'), async (req, res) =>
   try {
     const student = await Student.findById(req.params.id);
     if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
+    await applyMonthlyAccrual(student);
     const payments = await FeePayment.find({ student: student._id }).sort({ paymentDate: -1 });
     res.json({ success: true, data: { student, payments } });
   } catch (error) {
@@ -184,7 +189,7 @@ router.post('/students', requirePerm('students', 'create'), (req, res) => {
       return res.status(400).json({ success: false, message: msg });
     }
     try {
-      const { name, phone, password, course, totalFee, email, address, fatherName, motherName, dateOfBirth, gender, batch, batchId, notes, admissionDate } = req.body;
+      const { name, phone, password, course, totalFee, email, address, fatherName, motherName, dateOfBirth, gender, batch, batchId, notes, admissionDate, feeType, monthlyFee } = req.body;
 
       if (!name || !phone || !password || !course || totalFee === undefined || totalFee === '') {
         return res.status(400).json({ success: false, message: 'Name, phone, password, course and fee are required' });
@@ -201,6 +206,20 @@ router.post('/students', requirePerm('students', 'create'), (req, res) => {
         return res.status(400).json({ success: false, message: resolved.error });
       }
 
+      const courseDoc = await Course.findOne({ name: String(course).trim() });
+      const resolvedFeeType =
+        feeType === 'monthly' || feeType === 'one_time'
+          ? feeType
+          : courseDoc?.feeType === 'monthly'
+            ? 'monthly'
+            : 'one_time';
+
+      const admDate = admissionDate ? new Date(admissionDate) : new Date();
+      const baseFee = Number(totalFee) || 0;
+      const monthAmt = resolvedFeeType === 'monthly' ? (monthlyFee !== undefined && monthlyFee !== '' ? Number(monthlyFee) : baseFee) : 0;
+      const initialTotal =
+        resolvedFeeType === 'monthly' ? monthAmt * Math.max(1, monthlyPeriodsDue(admDate, new Date())) : baseFee;
+
       const avatarFile = req.files?.avatar?.[0];
       if (avatarFile && avatarFile.size > 50 * 1024) {
         return res.status(400).json({ success: false, message: 'Profile photo must be 50 KB or less' });
@@ -216,7 +235,9 @@ router.post('/students', requirePerm('students', 'create'), (req, res) => {
         phone: phone.trim(),
         password,
         course,
-        totalFee: Number(totalFee),
+        feeType: resolvedFeeType,
+        monthlyFee: resolvedFeeType === 'monthly' ? monthAmt : 0,
+        totalFee: initialTotal,
         email: email || '',
         address: address || '',
         fatherName: fatherName || '',
@@ -226,7 +247,7 @@ router.post('/students', requirePerm('students', 'create'), (req, res) => {
         batch: resolved.batch || '',
         batchId: resolved.batchId || null,
         notes: notes || '',
-        admissionDate: admissionDate || Date.now(),
+        admissionDate: admDate,
         documents,
         avatar: avatarFile ? `/uploads/${avatarFile.filename}` : '',
       });
@@ -255,12 +276,23 @@ router.put('/students/:id', requirePerm('students', 'edit'), (req, res) => {
       const student = await Student.findById(req.params.id);
       if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
 
-      const fields = ['name', 'phone', 'email', 'course', 'totalFee', 'address', 'fatherName', 'motherName', 'dateOfBirth', 'gender', 'notes', 'status', 'admissionDate'];
+      const fields = ['name', 'phone', 'email', 'course', 'totalFee', 'address', 'fatherName', 'motherName', 'dateOfBirth', 'gender', 'notes', 'status', 'admissionDate', 'feeType', 'monthlyFee'];
       fields.forEach((f) => {
         if (req.body[f] !== undefined && req.body[f] !== '') {
-          student[f] = f === 'totalFee' ? Number(req.body[f]) : req.body[f];
+          if (f === 'totalFee' || f === 'monthlyFee') student[f] = Number(req.body[f]);
+          else student[f] = req.body[f];
         }
       });
+
+      if (student.feeType === 'monthly' && req.body.totalFee !== undefined && req.body.totalFee !== '' && (req.body.monthlyFee === undefined || req.body.monthlyFee === '')) {
+        // If only totalFee sent while monthly, treat it as updating the monthly amount when periods=1-ish — keep monthlyFee in sync if monthlyFee was 0
+        if (!student.monthlyFee) student.monthlyFee = Number(req.body.totalFee) || 0;
+      }
+
+      if (req.body.course !== undefined && req.body.course !== '' && req.body.feeType === undefined) {
+        const courseDoc = await Course.findOne({ name: String(req.body.course).trim() });
+        if (courseDoc?.feeType) student.feeType = courseDoc.feeType;
+      }
 
       if (req.body.course !== undefined || req.body.batchId !== undefined || req.body.batch !== undefined) {
         const { resolveStudentBatch } = require('../utils/batches');
@@ -292,6 +324,7 @@ router.put('/students/:id', requirePerm('students', 'edit'), (req, res) => {
       }
 
       await student.save();
+      await applyMonthlyAccrual(student);
       res.json({ success: true, data: student, message: 'Student updated successfully' });
     } catch (error) {
       res.status(500).json({ success: false, message: error.message });
@@ -322,6 +355,7 @@ router.post('/fees', requirePerm('fees', 'create'), async (req, res) => {
 
     const student = await Student.findById(studentId);
     if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
+    await applyMonthlyAccrual(student);
 
     const pending = student.totalFee - student.paidFee;
     if (Number(amount) > pending) {
@@ -343,7 +377,7 @@ router.post('/fees', requirePerm('fees', 'create'), async (req, res) => {
 
     const populated = await FeePayment.findById(payment._id).populate(
       'student',
-      'name phone course batch fatherName totalFee paidFee'
+      'name phone course batch fatherName totalFee paidFee feeType monthlyFee'
     );
     res.status(201).json({ success: true, data: populated, message: 'Fee collected successfully' });
   } catch (error) {
@@ -406,7 +440,7 @@ router.get('/courses', requirePerm('courses', 'view'), async (req, res) => {
 
 router.post('/courses', requirePerm('courses', 'create'), async (req, res) => {
   try {
-    const { name, description, defaultFee, duration, isActive, shifts } = req.body;
+    const { name, description, defaultFee, duration, isActive, shifts, feeType } = req.body;
     if (!name) return res.status(400).json({ success: false, message: 'Course name is required' });
     const exists = await Course.findOne({ name: name.trim() });
     if (exists) return res.status(400).json({ success: false, message: 'Course with this name already exists' });
@@ -415,6 +449,7 @@ router.post('/courses', requirePerm('courses', 'create'), async (req, res) => {
       name: name.trim(),
       description,
       defaultFee: Number(defaultFee) || 0,
+      feeType: feeType === 'monthly' ? 'monthly' : 'one_time',
       duration,
       isActive: isActive !== false && isActive !== 'false',
       shifts: normalizeShifts(shifts) || [],
@@ -427,7 +462,7 @@ router.post('/courses', requirePerm('courses', 'create'), async (req, res) => {
 
 router.put('/courses/:id', requirePerm('courses', 'edit'), async (req, res) => {
   try {
-    const { name, description, defaultFee, duration, isActive, shifts } = req.body;
+    const { name, description, defaultFee, duration, isActive, shifts, feeType } = req.body;
     const course = await Course.findById(req.params.id);
     if (!course) return res.status(404).json({ success: false, message: 'Course not found' });
 
@@ -439,6 +474,7 @@ router.put('/courses/:id', requirePerm('courses', 'edit'), async (req, res) => {
     }
     if (description !== undefined) course.description = description;
     if (defaultFee !== undefined) course.defaultFee = Number(defaultFee) || 0;
+    if (feeType === 'monthly' || feeType === 'one_time') course.feeType = feeType;
     if (duration !== undefined) course.duration = duration;
     if (isActive !== undefined) course.isActive = isActive === true || isActive === 'true';
 

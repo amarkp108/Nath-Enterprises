@@ -103,5 +103,7 @@ export const firstStaffPath = (user, role) => {
   for (const item of STAFF_HOME_ORDER) {
     if (hasPermission(user, role, item.module, 'view')) return item.path;
   }
+  // Employees can always see their own attendance (no module permission)
+  if (role === 'employee') return '/admin/my-attendance';
   return '/admin/profile';
 };

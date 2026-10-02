@@ -12,6 +12,7 @@ const courseSchema = new mongoose.Schema(
     name: { type: String, required: true, unique: true, trim: true },
     description: { type: String, default: '' },
     defaultFee: { type: Number, default: 0 },
+    feeType: { type: String, enum: ['one_time', 'monthly'], default: 'one_time' },
     duration: { type: String, default: '' },
     isActive: { type: Boolean, default: true },
     shifts: { type: [shiftSchema], default: [] },

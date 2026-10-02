@@ -3,6 +3,7 @@ const Student = require('../models/Student');
 const FeePayment = require('../models/FeePayment');
 const { protect, studentOnly } = require('../middleware/auth');
 const upload = require('../middleware/upload');
+const { applyMonthlyAccrual } = require('../utils/monthlyFee');
 
 const router = express.Router();
 router.use(protect, studentOnly);
@@ -11,6 +12,7 @@ router.use(protect, studentOnly);
 router.get('/dashboard', async (req, res) => {
   try {
     const student = await Student.findById(req.user._id);
+    await applyMonthlyAccrual(student);
     const payments = await FeePayment.find({ student: student._id }).sort({ paymentDate: -1 });
     const pendingFee = Math.max(0, student.totalFee - student.paidFee);
     const percentPaid = student.totalFee > 0 ? Math.round((student.paidFee / student.totalFee) * 100) : 0;
@@ -84,8 +86,20 @@ router.delete('/documents/:docId', async (req, res) => {
 // Fee history
 router.get('/fees', async (req, res) => {
   try {
+    const student = await Student.findById(req.user._id);
+    await applyMonthlyAccrual(student);
     const payments = await FeePayment.find({ student: req.user._id }).sort({ paymentDate: -1 });
-    res.json({ success: true, data: payments });
+    res.json({
+      success: true,
+      data: payments,
+      fee: {
+        totalFee: student.totalFee,
+        paidFee: student.paidFee,
+        pendingFee: Math.max(0, student.totalFee - student.paidFee),
+        feeType: student.feeType,
+        monthlyFee: student.monthlyFee,
+      },
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
