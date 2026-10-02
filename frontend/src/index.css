@@ -1549,3 +1549,136 @@ tr.clickable:hover td {
   color: #fff;
   box-shadow: var(--shadow-sm);
 }
+
+/* Attendance person calendar */
+.attn-cal-year {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.attn-cal-month {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  padding: 0.65rem;
+}
+
+.attn-cal-month-title {
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-align: center;
+  margin-bottom: 0.4rem;
+}
+
+.attn-cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  margin-bottom: 2px;
+  text-align: center;
+  font-size: 0.65rem;
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+
+.attn-cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.attn-cal-cell {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: default;
+}
+
+.attn-cal-pad {
+  visibility: hidden;
+}
+
+.attn-cal-empty {
+  background: transparent;
+  color: var(--ink-muted);
+  font-weight: 400;
+}
+
+.attn-cal-present {
+  background: #059669;
+  color: #fff;
+}
+
+.attn-cal-late {
+  background: #d97706;
+  color: #fff;
+}
+
+.attn-cal-absent {
+  background: #dc2626;
+  color: #fff;
+}
+
+.attn-cal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px dashed var(--border);
+}
+
+.attn-cal-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+.attn-cal-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  display: inline-block;
+  border: 1px solid var(--border);
+}
+
+.attn-cal-dot.attn-cal-present {
+  background: #059669;
+  border-color: #059669;
+}
+
+.attn-cal-dot.attn-cal-late {
+  background: #d97706;
+  border-color: #d97706;
+}
+
+.attn-cal-dot.attn-cal-absent {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+
+.attn-cal-dot.attn-cal-empty {
+  background: var(--bg-muted);
+}
+
+.attn-name-link {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: inherit;
+  text-align: left;
+  font: inherit;
+}
+
+.attn-name-link:hover strong {
+  color: var(--brand);
+  text-decoration: underline;
+}

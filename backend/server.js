@@ -34,6 +34,21 @@ app.get('/api/health', (req, res) => {
 // Seed admin & default courses on startup
 const seedData = async () => {
   try {
+    // Allow multiple students per phone (drop old unique index if present)
+    try {
+      const Student = require('./models/Student');
+      await Student.collection.dropIndex('phone_1');
+      console.log('Dropped unique phone index on students');
+    } catch (e) {
+      // Index may already be non-unique or missing — ignore
+    }
+    try {
+      const Student = require('./models/Student');
+      await Student.collection.createIndex({ phone: 1 });
+    } catch (e) {
+      /* ignore */
+    }
+
     const adminExists = await Admin.findOne({ email: process.env.ADMIN_EMAIL });
     if (!adminExists) {
       await Admin.create({

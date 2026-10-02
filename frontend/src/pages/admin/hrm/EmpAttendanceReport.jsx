@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, FileBarChart } from 'lucide-react';
+import { ArrowLeft, FileBarChart, Search } from 'lucide-react';
 import api from '../../../api';
-import { formatDate, formatTime } from '../../../utils';
+import { formatDate, formatTime, localDateStr } from '../../../utils';
 import { useToast } from '../../../components/Toast';
+import AttendancePersonProfile from '../../../components/AttendancePersonProfile';
 
 export default function EmpAttendanceReport() {
   const toast = useToast();
@@ -13,12 +14,18 @@ export default function EmpAttendanceReport() {
   const [from, setFrom] = useState(() => {
     const d = new Date();
     d.setDate(1);
-    return d.toISOString().slice(0, 10);
+    return localDateStr(d);
   });
-  const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
-  const [tab, setTab] = useState('summary');
+  const [to, setTo] = useState(localDateStr());
+  const [tab, setTab] = useState('person');
+  const [search, setSearch] = useState('');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  const [personId, setPersonId] = useState(null);
+  const [personData, setPersonData] = useState(null);
+  const [personYear, setPersonYear] = useState(new Date().getFullYear());
+  const [personLoading, setPersonLoading] = useState(false);
 
   useEffect(() => {
     api.get('/hrm/employees').then((res) => setDepartments(res.data.departments || [])).catch(() => {});
@@ -46,6 +53,63 @@ export default function EmpAttendanceReport() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [department, from, to]);
 
+  const loadPerson = async (id, year = personYear) => {
+    setPersonId(id);
+    setPersonLoading(true);
+    try {
+      const { data: res } = await api.get(`/hrm/attendance/person/${id}?year=${year}`);
+      setPersonData(res.data);
+      setPersonYear(res.data.year);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to load profile');
+      setPersonData(null);
+    } finally {
+      setPersonLoading(false);
+    }
+  };
+
+  const q = search.trim().toLowerCase();
+  const filteredSummary = useMemo(() => {
+    const list = data?.summary || [];
+    if (!q) return list;
+    return list.filter(
+      (s) =>
+        s.employee?.name?.toLowerCase().includes(q) ||
+        s.employee?.phone?.includes(q) ||
+        s.employee?.employeeId?.toLowerCase().includes(q) ||
+        s.employee?.department?.toLowerCase().includes(q)
+    );
+  }, [data, q]);
+
+  const filteredRecords = useMemo(() => {
+    const list = data?.records || [];
+    if (!q) return list;
+    return list.filter(
+      (r) =>
+        r.employee?.name?.toLowerCase().includes(q) ||
+        r.employee?.phone?.includes(q) ||
+        (r.department || '').toLowerCase().includes(q) ||
+        (r.batchName || '').toLowerCase().includes(q)
+    );
+  }, [data, q]);
+
+  if (personId) {
+    return (
+      <AttendancePersonProfile
+        data={personData}
+        loading={personLoading || !personData}
+        onBack={() => {
+          setPersonId(null);
+          setPersonData(null);
+        }}
+        onYearChange={(y) => {
+          setPersonYear(y);
+          loadPerson(personId, y);
+        }}
+      />
+    );
+  }
+
   return (
     <>
       <div className="toolbar">
@@ -57,7 +121,7 @@ export default function EmpAttendanceReport() {
         </h3>
       </div>
 
-      <div className="toolbar">
+      <div className="toolbar" style={{ flexWrap: 'wrap' }}>
         <select className="form-control" style={{ maxWidth: 200 }} value={department} onChange={(e) => setDepartment(e.target.value)}>
           <option value="all">All Departments</option>
           {departments.map((d) => (
@@ -91,12 +155,15 @@ export default function EmpAttendanceReport() {
         </div>
       )}
 
-      <div className="role-tabs" style={{ maxWidth: 320, marginBottom: '1rem' }}>
-        <button type="button" className={`role-tab ${tab === 'summary' ? 'active' : ''}`} onClick={() => setTab('summary')}>
-          Employee Summary
+      <div className="role-tabs tabs-3" style={{ maxWidth: 420, marginBottom: '1rem' }}>
+        <button type="button" className={`role-tab ${tab === 'person' ? 'active' : ''}`} onClick={() => setTab('person')}>
+          Person-wise
         </button>
         <button type="button" className={`role-tab ${tab === 'detail' ? 'active' : ''}`} onClick={() => setTab('detail')}>
-          Day-wise Detail
+          Day-wise
+        </button>
+        <button type="button" className={`role-tab ${tab === 'summary' ? 'active' : ''}`} onClick={() => setTab('summary')}>
+          Summary
         </button>
       </div>
 
@@ -106,7 +173,25 @@ export default function EmpAttendanceReport() {
         <div className="empty-state">Failed to load report</div>
       ) : (
         <div className="card">
-          {tab === 'summary' ? (
+          <div className="toolbar" style={{ marginBottom: '0.85rem', paddingBottom: '0.85rem', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: 200, maxWidth: 320 }}>
+              <Search size={16} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-muted)' }} />
+              <input
+                className="form-control"
+                placeholder={tab === 'detail' ? 'Search in table…' : 'Search employee…'}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{ paddingLeft: 34 }}
+              />
+            </div>
+            {q && (
+              <span style={{ fontSize: '0.8rem', color: 'var(--ink-muted)' }}>
+                {tab === 'detail' ? filteredRecords.length : filteredSummary.length} result
+                {(tab === 'detail' ? filteredRecords.length : filteredSummary.length) !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+          {tab === 'person' || tab === 'summary' ? (
             <div className="table-wrap">
               <table>
                 <thead>
@@ -121,20 +206,22 @@ export default function EmpAttendanceReport() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.summary.length === 0 ? (
+                  {filteredSummary.length === 0 ? (
                     <tr>
                       <td colSpan={7} style={{ textAlign: 'center', color: 'var(--ink-muted)' }}>
-                        No attendance records in this range
+                        {q ? 'No employees match your search' : 'No attendance records in this range'}
                       </td>
                     </tr>
                   ) : (
-                    data.summary.map((s) => (
-                      <tr key={s.employee._id}>
+                    filteredSummary.map((s) => (
+                      <tr key={s.employee._id} className="clickable" onClick={() => loadPerson(s.employee._id)}>
                         <td>
-                          <strong>{s.employee.name}</strong>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>
-                            {s.employee.employeeId} · {s.employee.phone}
-                          </div>
+                          <button type="button" className="attn-name-link" onClick={(e) => { e.stopPropagation(); loadPerson(s.employee._id); }}>
+                            <strong>{s.employee.name}</strong>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>
+                              {s.employee.employeeId} · {s.employee.phone}
+                            </div>
+                          </button>
                         </td>
                         <td>
                           <span className="badge badge-info">{s.employee.department}</span>
@@ -168,14 +255,14 @@ export default function EmpAttendanceReport() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.records.length === 0 ? (
+                  {filteredRecords.length === 0 ? (
                     <tr>
                       <td colSpan={6} style={{ textAlign: 'center', color: 'var(--ink-muted)' }}>
-                        No records found
+                        {q ? 'No records match your search' : 'No records found'}
                       </td>
                     </tr>
                   ) : (
-                    data.records.map((r) => (
+                    filteredRecords.map((r) => (
                       <tr key={r._id} style={r.isLate ? { background: 'var(--danger-soft)' } : undefined}>
                         <td>{formatDate(r.date)}</td>
                         <td style={{ whiteSpace: 'nowrap', color: r.isLate ? 'var(--danger)' : undefined, fontWeight: r.isLate ? 700 : undefined }}>
@@ -183,17 +270,20 @@ export default function EmpAttendanceReport() {
                           {r.isLate ? ' · Late' : ''}
                         </td>
                         <td>
-                          <strong>{r.employee?.name || '—'}</strong>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>{r.department}</div>
+                          <button
+                            type="button"
+                            className="attn-name-link"
+                            onClick={() => r.employee?._id && loadPerson(r.employee._id)}
+                          >
+                            <strong>{r.employee?.name || '—'}</strong>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>{r.department}</div>
+                          </button>
                         </td>
                         <td style={{ fontSize: '0.85rem' }}>
                           {r.batchName ? (
                             <>
                               {r.courseName ? `${r.courseName}: ` : ''}
                               {r.batchName}
-                              {r.startTime ? (
-                                <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>Start {r.startTime}</div>
-                              ) : null}
                             </>
                           ) : (
                             '—'

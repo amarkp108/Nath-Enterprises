@@ -19,6 +19,21 @@ const endOfDay = (d) => {
   return x;
 };
 
+const parseMarkedAt = (date, markedAt) => {
+  if (markedAt) {
+    const t = new Date(markedAt);
+    if (!Number.isNaN(t.getTime())) return t;
+  }
+  // Default: attendance date + current clock time (supports backdate)
+  if (date) {
+    const day = startOfDay(date);
+    const now = new Date();
+    day.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), 0);
+    return day;
+  }
+  return new Date();
+};
+
 const assertEmployeeBatchAccess = (req, courseName, batchId) => {
   if (req.role !== 'employee') return null;
   if (!batchId) {
@@ -159,7 +174,7 @@ router.get('/admin/sheet', protect, adminOrEmployee, requirePerm('attendance', '
 // ─── Admin: mark / bulk save attendance ───
 router.post('/admin/mark', protect, adminOrEmployee, requirePerm('attendance', 'create'), async (req, res) => {
   try {
-    const { course, date, records, batch, batchId } = req.body;
+    const { course, date, records, batch, batchId, markedAt } = req.body;
     if (!course || !date || !Array.isArray(records) || records.length === 0) {
       return res.status(400).json({ success: false, message: 'Course, date and attendance records are required' });
     }
@@ -194,12 +209,14 @@ router.post('/admin/mark', protect, adminOrEmployee, requirePerm('attendance', '
     const allowedIds = new Set((await Student.find(studentFilter).select('_id')).map((s) => String(s._id)));
 
     const day = startOfDay(date);
-    const now = new Date();
+    const stamp = parseMarkedAt(date, markedAt);
     let saved = 0;
 
     for (const rec of records) {
       if (!rec.studentId || !['P', 'A'].includes(rec.status)) continue;
       if (!allowedIds.has(String(rec.studentId))) continue;
+
+      const rowMarkedAt = rec.markedAt ? parseMarkedAt(date, rec.markedAt) : stamp;
 
       await Attendance.findOneAndUpdate(
         { student: rec.studentId, date: day },
@@ -211,7 +228,7 @@ router.post('/admin/mark', protect, adminOrEmployee, requirePerm('attendance', '
           date: day,
           status: rec.status,
           remark: rec.remark || '',
-          markedAt: now,
+          markedAt: rowMarkedAt,
           markedBy: req.user._id,
         },
         { upsert: true, new: true, setDefaultsOnInsert: true }
@@ -223,7 +240,7 @@ router.post('/admin/mark', protect, adminOrEmployee, requirePerm('attendance', '
       success: true,
       message: `Attendance saved for ${saved} student(s)`,
       saved,
-      markedAt: now,
+      markedAt: stamp,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -393,6 +410,89 @@ router.get('/student/my', protect, studentOnly, async (req, res) => {
       data: {
         records,
         stats: { present, absent, total, percent },
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ─── Person-wise year calendar (student) ───
+router.get('/admin/person/:studentId', protect, adminOrEmployee, requirePerm('attendance', 'view'), async (req, res) => {
+  try {
+    const student = await Student.findById(req.params.studentId).select(
+      'name phone course batch batchId avatar status fatherName admissionDate'
+    );
+    if (!student) return res.status(404).json({ success: false, message: 'Student not found' });
+
+    if (req.role === 'employee') {
+      const assigned = req.user.assignedBatches || [];
+      const ok = assigned.some(
+        (b) =>
+          b.courseName === student.course &&
+          (!student.batchId || String(b.batchId) === String(student.batchId))
+      );
+      // Also allow if course-level assignment without batch match when student has no batch
+      const courseOk = assigned.some((b) => b.courseName === student.course);
+      if (!ok && !courseOk) {
+        return res.status(403).json({ success: false, message: 'Not allowed for this student' });
+      }
+    }
+
+    const year = Number(req.query.year) || new Date().getFullYear();
+    const from = new Date(year, 0, 1);
+    const to = new Date(year, 11, 31, 23, 59, 59, 999);
+
+    const records = await Attendance.find({
+      student: student._id,
+      date: { $gte: from, $lte: to },
+    }).sort({ date: 1 });
+
+    const shiftMap = await buildShiftTimeMap();
+    const days = {};
+    let present = 0;
+    let absent = 0;
+    let late = 0;
+
+    const toDayKey = (d) => {
+      const x = new Date(d);
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`;
+    };
+
+    records.forEach((r) => {
+      const key = toDayKey(r.date);
+      const shift = r.batchId ? shiftMap[String(r.batchId)] : null;
+      const startTime = shift?.startTime || '';
+      const isLate = r.status === 'P' && isAttendanceLate(r.markedAt, startTime);
+      if (r.status === 'P') present += 1;
+      else absent += 1;
+      if (isLate) late += 1;
+      days[key] = {
+        status: r.status,
+        isLate,
+        markedAt: r.markedAt || null,
+        batch: r.batch || '',
+        course: r.course || '',
+        startTime,
+      };
+    });
+
+    const total = present + absent;
+    res.json({
+      success: true,
+      data: {
+        person: student,
+        type: 'student',
+        year,
+        days,
+        stats: {
+          present,
+          absent,
+          late,
+          total,
+          percent: total > 0 ? Math.round((present / total) * 100) : 0,
+        },
       },
     });
   } catch (error) {

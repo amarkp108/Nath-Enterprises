@@ -3,13 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import api from '../../../api';
 import { useToast } from '../../../components/Toast';
-import { formatTime } from '../../../utils';
-
-const nowLocal = () => {
-  const d = new Date();
-  const pad = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
+import { formatTime, localDateStr, dateWithCurrentTime, shiftDateByDays, isPastDate } from '../../../utils';
 
 export default function MarkEmpAttendance() {
   const toast = useToast();
@@ -18,8 +12,8 @@ export default function MarkEmpAttendance() {
   const [department, setDepartment] = useState('all');
   const [batchFilter, setBatchFilter] = useState('all');
   const [batches, setBatches] = useState([]);
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const [markTime, setMarkTime] = useState(nowLocal);
+  const [date, setDate] = useState(localDateStr());
+  const [markTime, setMarkTime] = useState(() => dateWithCurrentTime(localDateStr()));
   const [sheet, setSheet] = useState([]);
   const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -122,6 +116,14 @@ export default function MarkEmpAttendance() {
   const absentCount = sheet.filter((r) => r.status === 'A').length;
 
   const batchOptions = useMemo(() => batches, [batches]);
+  const backdated = isPastDate(date);
+  const today = localDateStr();
+  const yesterday = shiftDateByDays(today, -1);
+
+  const setAttendanceDate = (nextDate) => {
+    setDate(nextDate);
+    setMarkTime(dateWithCurrentTime(nextDate));
+  };
 
   return (
     <>
@@ -162,9 +164,23 @@ export default function MarkEmpAttendance() {
           <div className="form-row" style={{ marginBottom: 0 }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label>
-                Date <span className="req">*</span>
+                Attendance Date <span className="req">*</span>
               </label>
-              <input className="form-control" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+              <input
+                className="form-control"
+                type="date"
+                value={date}
+                max={today}
+                onChange={(e) => setAttendanceDate(e.target.value)}
+              />
+              <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                <button type="button" className={`btn btn-sm ${date === today ? 'btn-primary' : 'btn-outline'}`} onClick={() => setAttendanceDate(today)}>
+                  Today
+                </button>
+                <button type="button" className={`btn btn-sm ${date === yesterday ? 'btn-primary' : 'btn-outline'}`} onClick={() => setAttendanceDate(yesterday)}>
+                  Yesterday
+                </button>
+              </div>
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label>
@@ -176,6 +192,14 @@ export default function MarkEmpAttendance() {
                 value={markTime}
                 onChange={(e) => setMarkTime(e.target.value)}
               />
+              <small style={{ color: 'var(--ink-muted)', display: 'block', marginTop: 4 }}>
+                For backdated attendance, set the actual check-in time
+              </small>
+              {backdated && (
+                <span className="badge badge-warning" style={{ marginTop: 8, display: 'inline-block' }}>
+                  Backdated — saving for {date}
+                </span>
+              )}
             </div>
           </div>
         </div>

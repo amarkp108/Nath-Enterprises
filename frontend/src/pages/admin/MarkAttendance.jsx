@@ -4,7 +4,7 @@ import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import api, { assetUrl } from '../../api';
 import { useToast } from '../../components/Toast';
 import { useAuth } from '../../context/AuthContext';
-import { formatTime } from '../../utils';
+import { formatTime, localDateStr, dateWithCurrentTime, shiftDateByDays, isPastDate } from '../../utils';
 
 export default function MarkAttendance() {
   const toast = useToast();
@@ -13,7 +13,8 @@ export default function MarkAttendance() {
   const [batches, setBatches] = useState([]);
   const [course, setCourse] = useState('');
   const [batchId, setBatchId] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(localDateStr());
+  const [markTime, setMarkTime] = useState(() => dateWithCurrentTime(localDateStr()));
   const [sheet, setSheet] = useState([]);
   const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -109,6 +110,7 @@ export default function MarkAttendance() {
       const payload = {
         course,
         date,
+        markedAt: markTime ? new Date(markTime).toISOString() : undefined,
         records: records.map((r) => ({
           studentId: r.studentId,
           status: r.status,
@@ -134,11 +136,19 @@ export default function MarkAttendance() {
     }
   };
 
+  const setAttendanceDate = (nextDate) => {
+    setDate(nextDate);
+    setMarkTime(dateWithCurrentTime(nextDate));
+  };
+
   const presentCount = sheet.filter((r) => r.status === 'P').length;
   const absentCount = sheet.filter((r) => r.status === 'A').length;
 
   const needsBatch = shiftsForCourse.length > 0;
   const canLoad = course && (!needsBatch || batchId);
+  const backdated = isPastDate(date);
+  const today = localDateStr();
+  const yesterday = shiftDateByDays(today, -1);
 
   return (
     <>
@@ -157,7 +167,7 @@ export default function MarkAttendance() {
         <>
           <div className="card" style={{ marginBottom: '1.25rem' }}>
             <div className="card-body">
-              <div className="form-row-3" style={{ marginBottom: 0 }}>
+              <div className="form-row-3" style={{ marginBottom: '0.85rem' }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label>
                     Class / Course <span className="req">*</span>
@@ -212,9 +222,50 @@ export default function MarkAttendance() {
                 </div>
                 <div className="form-group" style={{ marginBottom: 0 }}>
                   <label>
-                    Date <span className="req">*</span>
+                    Attendance Date <span className="req">*</span>
                   </label>
-                  <input className="form-control" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                  <input
+                    className="form-control"
+                    type="date"
+                    value={date}
+                    max={today}
+                    onChange={(e) => setAttendanceDate(e.target.value)}
+                  />
+                  <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                    <button type="button" className={`btn btn-sm ${date === today ? 'btn-primary' : 'btn-outline'}`} onClick={() => setAttendanceDate(today)}>
+                      Today
+                    </button>
+                    <button type="button" className={`btn btn-sm ${date === yesterday ? 'btn-primary' : 'btn-outline'}`} onClick={() => setAttendanceDate(yesterday)}>
+                      Yesterday
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="form-row" style={{ marginBottom: 0 }}>
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label>
+                    Marked At (date & time) <span className="req">*</span>
+                  </label>
+                  <input
+                    className="form-control"
+                    type="datetime-local"
+                    value={markTime}
+                    onChange={(e) => setMarkTime(e.target.value)}
+                  />
+                  <small style={{ color: 'var(--ink-muted)', display: 'block', marginTop: 4 }}>
+                    For backdated attendance, set the actual time students were marked
+                  </small>
+                </div>
+                <div className="form-group" style={{ marginBottom: 0, display: 'flex', alignItems: 'end' }}>
+                  {backdated ? (
+                    <span className="badge badge-warning" style={{ fontSize: '0.85rem', padding: '0.55rem 0.85rem' }}>
+                      Backdated — saving for {date}
+                    </span>
+                  ) : (
+                    <span className="badge badge-success" style={{ fontSize: '0.85rem', padding: '0.55rem 0.85rem' }}>
+                      Today&apos;s attendance
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

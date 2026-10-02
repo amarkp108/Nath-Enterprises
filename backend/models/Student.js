@@ -10,7 +10,8 @@ const documentSchema = new mongoose.Schema({
 const studentSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
-    phone: { type: String, required: true, unique: true, trim: true },
+    // Multiple students (siblings) can share one parent mobile number
+    phone: { type: String, required: true, trim: true, index: true },
     password: { type: String, required: true, minlength: 6 },
     email: { type: String, default: '', trim: true, lowercase: true },
     course: { type: String, required: true, trim: true },
@@ -44,6 +45,8 @@ studentSchema.set('toObject', { virtuals: true });
 
 studentSchema.pre('save', async function () {
   if (!this.isModified('password')) return;
+  // Copying an existing bcrypt hash for sibling accounts
+  if (this._skipPasswordHash) return;
   this.password = await bcrypt.hash(this.password, 12);
 });
 

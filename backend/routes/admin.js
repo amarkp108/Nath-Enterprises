@@ -162,6 +162,37 @@ router.get('/students', requirePerm('students', 'view'), async (req, res) => {
   }
 });
 
+// Check if phone already has student(s) — for shared-family password UX
+router.get('/students/check-phone', requirePerm('students', 'create'), async (req, res) => {
+  try {
+    const phone = String(req.query.phone || '').trim();
+    if (!phone || phone.length < 10) {
+      return res.json({ success: true, data: { exists: false, count: 0, students: [] } });
+    }
+    const students = await Student.find({ phone }).select('name course batch status').sort({ createdAt: 1 });
+    res.json({
+      success: true,
+      data: {
+        exists: students.length > 0,
+        count: students.length,
+        students: students.map((s) => ({
+          _id: s._id,
+          name: s.name,
+          course: s.course,
+          batch: s.batch || '',
+          status: s.status,
+        })),
+        message:
+          students.length > 0
+            ? 'Already added — use previous password for login'
+            : '',
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 // Get single student with payments
 router.get('/students/:id', requirePerm('students', 'view'), async (req, res) => {
   try {
@@ -191,13 +222,15 @@ router.post('/students', requirePerm('students', 'create'), (req, res) => {
     try {
       const { name, phone, password, course, totalFee, email, address, fatherName, motherName, dateOfBirth, gender, batch, batchId, notes, admissionDate, feeType, monthlyFee } = req.body;
 
-      if (!name || !phone || !password || !course || totalFee === undefined || totalFee === '') {
-        return res.status(400).json({ success: false, message: 'Name, phone, password, course and fee are required' });
+      if (!name || !phone || !course || totalFee === undefined || totalFee === '') {
+        return res.status(400).json({ success: false, message: 'Name, phone, course and fee are required' });
       }
 
-      const exists = await Student.findOne({ phone: phone.trim() });
-      if (exists) {
-        return res.status(400).json({ success: false, message: 'Student with this phone number already exists' });
+      const phoneKey = String(phone).trim();
+      const existingSibling = await Student.findOne({ phone: phoneKey }).select('+password');
+
+      if (!existingSibling && (!password || String(password).length < 6)) {
+        return res.status(400).json({ success: false, message: 'Password is required (min 6 characters) for new mobile numbers' });
       }
 
       const { resolveStudentBatch } = require('../utils/batches');
@@ -230,10 +263,10 @@ router.post('/students', requirePerm('students', 'create'), (req, res) => {
         url: `/uploads/${f.filename}`,
       }));
 
-      const student = await Student.create({
+      const student = new Student({
         name,
-        phone: phone.trim(),
-        password,
+        phone: phoneKey,
+        password: existingSibling ? existingSibling.password : password,
         course,
         feeType: resolvedFeeType,
         monthlyFee: resolvedFeeType === 'monthly' ? monthAmt : 0,
@@ -251,8 +284,17 @@ router.post('/students', requirePerm('students', 'create'), (req, res) => {
         documents,
         avatar: avatarFile ? `/uploads/${avatarFile.filename}` : '',
       });
+      if (existingSibling) student._skipPasswordHash = true;
+      await student.save();
 
-      res.status(201).json({ success: true, data: student, message: 'Student added successfully' });
+      res.status(201).json({
+        success: true,
+        data: student,
+        message: existingSibling
+          ? 'Student added. Same phone — use the previous password to login.'
+          : 'Student added successfully',
+        sharedPhone: !!existingSibling,
+      });
     } catch (error) {
       res.status(500).json({ success: false, message: error.message });
     }
@@ -324,6 +366,18 @@ router.put('/students/:id', requirePerm('students', 'edit'), (req, res) => {
       }
 
       await student.save();
+
+      // Sync shared password across siblings on same phone
+      if (req.body.password && req.body.password.length >= 6) {
+        const hashed = student.password;
+        const siblings = await Student.find({ phone: student.phone, _id: { $ne: student._id } }).select('+password');
+        for (const sib of siblings) {
+          sib.password = hashed;
+          sib._skipPasswordHash = true;
+          await sib.save();
+        }
+      }
+
       await applyMonthlyAccrual(student);
       res.json({ success: true, data: student, message: 'Student updated successfully' });
     } catch (error) {

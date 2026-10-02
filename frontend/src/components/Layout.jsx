@@ -82,7 +82,7 @@ const titles = {
 };
 
 export default function Layout() {
-  const { user, role, logout } = useAuth();
+  const { user, role, logout, siblings, switchStudent } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -136,6 +136,19 @@ export default function Layout() {
     .toUpperCase();
 
   const roleLabel = role === 'admin' ? 'Administrator' : role === 'employee' ? user?.department || 'Employee' : user?.course;
+
+  const otherSiblings = (siblings || []).filter((s) => String(s._id) !== String(user?._id));
+
+  const handleSwitchStudent = async (studentId) => {
+    setMenuOpen(false);
+    try {
+      await switchStudent(studentId);
+      navigate('/student');
+      window.location.reload();
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   return (
     <div className="app-shell">
@@ -213,6 +226,23 @@ export default function Layout() {
 
               {menuOpen && (
                 <div className="dropdown">
+                  {role === 'student' && otherSiblings.length > 0 && (
+                    <>
+                      <div style={{ padding: '0.5rem 0.85rem 0.25rem', fontSize: '0.7rem', color: 'var(--ink-muted)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        Switch student
+                      </div>
+                      {otherSiblings.map((s) => (
+                        <button key={s._id} className="dropdown-item" onClick={() => handleSwitchStudent(s._id)}>
+                          <User size={16} />
+                          <span>
+                            {s.name}
+                            <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--ink-muted)' }}>{s.course}</span>
+                          </span>
+                        </button>
+                      ))}
+                      <div style={{ height: 1, background: 'var(--border)', margin: '0.35rem 0' }} />
+                    </>
+                  )}
                   <button
                     className="dropdown-item"
                     onClick={() => {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { X, Loader2, Lock } from 'lucide-react';
 import api from '../api';
 import { useToast } from './Toast';
 
@@ -25,6 +25,8 @@ const empty = {
   admissionDate: new Date().toISOString().slice(0, 10),
 };
 
+const digitsOnly = (v) => String(v || '').replace(/\D/g, '').slice(0, 10);
+
 export default function AddStudentModal({ onClose, onSuccess, student }) {
   const toast = useToast();
   const isEdit = !!student;
@@ -33,6 +35,8 @@ export default function AddStudentModal({ onClose, onSuccess, student }) {
   const [files, setFiles] = useState([]);
   const [avatar, setAvatar] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [phoneInfo, setPhoneInfo] = useState({ exists: false, count: 0, students: [], message: '' });
+  const [checkingPhone, setCheckingPhone] = useState(false);
 
   useEffect(() => {
     api.get('/admin/courses').then((res) => setCourses(res.data.data.filter((c) => c.isActive !== false))).catch(console.error);
@@ -59,7 +63,39 @@ export default function AddStudentModal({ onClose, onSuccess, student }) {
     }
   }, [student]);
 
+  useEffect(() => {
+    if (isEdit) return;
+    const phone = digitsOnly(form.phone);
+    if (phone.length !== 10) {
+      setPhoneInfo({ exists: false, count: 0, students: [], message: '' });
+      return;
+    }
+    let cancelled = false;
+    setCheckingPhone(true);
+    const t = setTimeout(() => {
+      api
+        .get(`/admin/students/check-phone?phone=${encodeURIComponent(phone)}`)
+        .then((res) => {
+          if (cancelled) return;
+          const data = res.data.data || {};
+          setPhoneInfo(data);
+          if (data.exists) setForm((f) => ({ ...f, password: '', phone }));
+        })
+        .catch(() => {
+          if (!cancelled) setPhoneInfo({ exists: false, count: 0, students: [], message: '' });
+        })
+        .finally(() => {
+          if (!cancelled) setCheckingPhone(false);
+        });
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [form.phone, isEdit]);
+
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  const passwordLocked = !isEdit && phoneInfo.exists;
 
   const selectedCourse = courses.find((c) => c.name === form.course);
   const courseShifts = (selectedCourse?.shifts || []).filter((s) => s.isActive !== false);
@@ -101,7 +137,7 @@ export default function AddStudentModal({ onClose, onSuccess, student }) {
       toast.warning('Please select a batch/shift for this course');
       return;
     }
-    if (!isEdit && !form.password) {
+    if (!isEdit && !passwordLocked && !form.password) {
       toast.warning('Password is required for new students');
       return;
     }
@@ -110,6 +146,7 @@ export default function AddStudentModal({ onClose, onSuccess, student }) {
     try {
       const fd = new FormData();
       Object.entries(form).forEach(([k, v]) => {
+        if (k === 'password' && passwordLocked) return;
         if (v !== '' && v !== undefined) fd.append(k, v);
       });
       const feeType = form.feeType === 'monthly' || selectedCourse?.feeType === 'monthly' ? 'monthly' : 'one_time';
@@ -126,10 +163,10 @@ export default function AddStudentModal({ onClose, onSuccess, student }) {
         });
         toast.success('Student updated successfully');
       } else {
-        await api.post('/admin/students', fd, {
+        const { data } = await api.post('/admin/students', fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
-        toast.success('Student added successfully');
+        toast.success(data.message || 'Student added successfully');
       }
       onSuccess();
     } catch (err) {
@@ -162,24 +199,60 @@ export default function AddStudentModal({ onClose, onSuccess, student }) {
                 <label>
                   Phone <span className="req">*</span>
                 </label>
-                <input className="form-control" type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} required />
+                <input
+                  className="form-control"
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={10}
+                  value={form.phone}
+                  onChange={(e) => set('phone', digitsOnly(e.target.value))}
+                  required
+                />
+                {!isEdit && checkingPhone && digitsOnly(form.phone).length === 10 && (
+                  <small style={{ color: 'var(--ink-muted)', display: 'block', marginTop: 4 }}>Checking phone…</small>
+                )}
+                {!isEdit && phoneInfo.exists && (
+                  <div
+                    style={{
+                      marginTop: 8,
+                      padding: '0.65rem 0.75rem',
+                      background: 'var(--warning-soft)',
+                      borderRadius: 'var(--radius-xs)',
+                      border: '1px solid #fbbf24',
+                      fontSize: '0.82rem',
+                    }}
+                  >
+                    <strong>Already added</strong> — use previous password for the login.
+                    <div style={{ marginTop: 4, color: 'var(--ink-muted)' }}>
+                      {phoneInfo.count} student(s) on this number: {phoneInfo.students.map((s) => s.name).join(', ')}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="form-row">
               <div className="form-group">
                 <label>
-                  Password {!isEdit && <span className="req">*</span>}
+                  Password {!isEdit && !passwordLocked && <span className="req">*</span>}
                   {isEdit && <span style={{ fontWeight: 400, color: 'var(--ink-muted)' }}> (leave blank to keep)</span>}
+                  {passwordLocked && (
+                    <span style={{ fontWeight: 400, color: 'var(--warning)', marginLeft: 6 }}>
+                      <Lock size={12} style={{ display: 'inline', verticalAlign: -1 }} /> Locked
+                    </span>
+                  )}
                 </label>
                 <input
                   className="form-control"
                   type="text"
-                  value={form.password}
+                  value={passwordLocked ? '•••••••• (use previous password)' : form.password}
                   onChange={(e) => set('password', e.target.value)}
-                  required={!isEdit}
-                  minLength={6}
-                  placeholder={isEdit ? '••••••' : 'Min 6 characters'}
+                  required={!isEdit && !passwordLocked}
+                  minLength={passwordLocked ? undefined : 6}
+                  placeholder={isEdit ? '••••••' : passwordLocked ? 'Using previous password' : 'Min 6 characters'}
+                  disabled={passwordLocked}
+                  readOnly={passwordLocked}
+                  style={passwordLocked ? { background: 'var(--bg-muted)', color: 'var(--ink-muted)' } : undefined}
                 />
               </div>
               <div className="form-group">

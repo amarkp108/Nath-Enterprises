@@ -33,6 +33,12 @@ const parseMarkedAt = (date, markedAt) => {
     const t = new Date(markedAt);
     if (!Number.isNaN(t.getTime())) return t;
   }
+  if (date) {
+    const day = startOfDay(date);
+    const now = new Date();
+    day.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), 0);
+    return day;
+  }
   return new Date();
 };
 
@@ -416,6 +422,72 @@ router.get('/attendance/report', async (req, res) => {
           absent: records.filter((r) => r.status === 'A').length,
           late: lateTotal,
           total: records.length,
+        },
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ─── Person-wise year calendar (employee) ───
+router.get('/attendance/person/:employeeId', async (req, res) => {
+  try {
+    const employee = await Employee.findById(req.params.employeeId).select(
+      'name phone department designation employeeId avatar status joinDate assignedBatches'
+    );
+    if (!employee) return res.status(404).json({ success: false, message: 'Employee not found' });
+
+    const year = Number(req.query.year) || new Date().getFullYear();
+    const from = new Date(year, 0, 1);
+    const to = new Date(year, 11, 31, 23, 59, 59, 999);
+
+    const records = await EmployeeAttendance.find({
+      employee: employee._id,
+      date: { $gte: from, $lte: to },
+    }).sort({ date: 1 });
+
+    const days = {};
+    let present = 0;
+    let absent = 0;
+    let late = 0;
+
+    const toDayKey = (d) => {
+      const x = new Date(d);
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${x.getFullYear()}-${pad(x.getMonth() + 1)}-${pad(x.getDate())}`;
+    };
+
+    records.forEach((r) => {
+      const key = toDayKey(r.date);
+      const isLate = r.status === 'P' && isAttendanceLate(r.markedAt, r.startTime);
+      if (r.status === 'P') present += 1;
+      else absent += 1;
+      if (isLate) late += 1;
+      days[key] = {
+        status: r.status,
+        isLate,
+        markedAt: r.markedAt || null,
+        batch: r.batchName || '',
+        course: r.courseName || '',
+        startTime: r.startTime || '',
+      };
+    });
+
+    const total = present + absent;
+    res.json({
+      success: true,
+      data: {
+        person: employee,
+        type: 'employee',
+        year,
+        days,
+        stats: {
+          present,
+          absent,
+          late,
+          total,
+          percent: total > 0 ? Math.round((present / total) * 100) : 0,
         },
       },
     });

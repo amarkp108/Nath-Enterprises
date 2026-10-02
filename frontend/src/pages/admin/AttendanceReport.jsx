@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, FileBarChart } from 'lucide-react';
+import { ArrowLeft, FileBarChart, Search } from 'lucide-react';
 import api from '../../api';
-import { formatDate, formatTime } from '../../utils';
+import { formatDate, formatTime, localDateStr } from '../../utils';
+import AttendancePersonProfile from '../../components/AttendancePersonProfile';
 
 export default function AttendanceReport() {
   const navigate = useNavigate();
@@ -12,12 +13,18 @@ export default function AttendanceReport() {
   const [from, setFrom] = useState(() => {
     const d = new Date();
     d.setDate(1);
-    return d.toISOString().slice(0, 10);
+    return localDateStr(d);
   });
-  const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
-  const [tab, setTab] = useState('detail');
+  const [to, setTo] = useState(localDateStr());
+  const [tab, setTab] = useState('person');
+  const [search, setSearch] = useState('');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  const [personId, setPersonId] = useState(null);
+  const [personData, setPersonData] = useState(null);
+  const [personYear, setPersonYear] = useState(new Date().getFullYear());
+  const [personLoading, setPersonLoading] = useState(false);
 
   useEffect(() => {
     api
@@ -56,6 +63,63 @@ export default function AttendanceReport() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [course, batchId, from, to]);
 
+  const loadPerson = async (id, year = personYear) => {
+    setPersonId(id);
+    setPersonLoading(true);
+    try {
+      const { data: res } = await api.get(`/attendance/admin/person/${id}?year=${year}`);
+      setPersonData(res.data);
+      setPersonYear(res.data.year);
+    } catch (err) {
+      console.error(err);
+      setPersonData(null);
+    } finally {
+      setPersonLoading(false);
+    }
+  };
+
+  const q = search.trim().toLowerCase();
+  const filteredSummary = useMemo(() => {
+    const list = data?.summary || [];
+    if (!q) return list;
+    return list.filter(
+      (s) =>
+        s.student?.name?.toLowerCase().includes(q) ||
+        s.student?.phone?.includes(q) ||
+        s.student?.course?.toLowerCase().includes(q) ||
+        s.student?.batch?.toLowerCase().includes(q)
+    );
+  }, [data, q]);
+
+  const filteredRecords = useMemo(() => {
+    const list = data?.records || [];
+    if (!q) return list;
+    return list.filter(
+      (r) =>
+        r.student?.name?.toLowerCase().includes(q) ||
+        r.student?.phone?.includes(q) ||
+        r.course?.toLowerCase().includes(q) ||
+        (r.batch || '').toLowerCase().includes(q)
+    );
+  }, [data, q]);
+
+  if (personId) {
+    return (
+      <AttendancePersonProfile
+        data={personData}
+        loading={personLoading || !personData}
+        onBack={() => {
+          setPersonId(null);
+          setPersonData(null);
+        }}
+        onYearChange={(y) => {
+          setPersonYear(y);
+          loadPerson(personId, y);
+        }}
+      />
+    );
+  }
+
   return (
     <>
       <div className="toolbar">
@@ -67,7 +131,7 @@ export default function AttendanceReport() {
         </h3>
       </div>
 
-      <div className="toolbar">
+      <div className="toolbar" style={{ flexWrap: 'wrap' }}>
         <select
           className="form-control"
           style={{ maxWidth: 200 }}
@@ -117,21 +181,22 @@ export default function AttendanceReport() {
             <div className="stat-label">Absent</div>
             <div className="stat-value">{data.totals.absent}</div>
           </div>
-          <div className="stat-card" style={{ '--accent-color': '#b91c1c', '--icon-bg': '#fee2e2' }}>
+          <div className="stat-card" style={{ '--accent-color': '#d97706', '--icon-bg': '#fef3c7' }}>
             <div className="stat-label">Late</div>
-            <div className="stat-value" style={{ color: 'var(--danger)' }}>
-              {data.totals.late ?? 0}
-            </div>
+            <div className="stat-value">{data.totals.late ?? 0}</div>
           </div>
         </div>
       )}
 
-      <div className="role-tabs" style={{ maxWidth: 320, marginBottom: '1rem' }}>
+      <div className="role-tabs tabs-3" style={{ maxWidth: 420, marginBottom: '1rem' }}>
+        <button type="button" className={`role-tab ${tab === 'person' ? 'active' : ''}`} onClick={() => setTab('person')}>
+          Person-wise
+        </button>
         <button type="button" className={`role-tab ${tab === 'detail' ? 'active' : ''}`} onClick={() => setTab('detail')}>
-          Day-wise Detail
+          Day-wise
         </button>
         <button type="button" className={`role-tab ${tab === 'summary' ? 'active' : ''}`} onClick={() => setTab('summary')}>
-          Student Summary
+          Summary
         </button>
       </div>
 
@@ -141,7 +206,25 @@ export default function AttendanceReport() {
         <div className="empty-state">Failed to load report</div>
       ) : (
         <div className="card">
-          {tab === 'summary' ? (
+          <div className="toolbar" style={{ marginBottom: '0.85rem', paddingBottom: '0.85rem', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ position: 'relative', flex: 1, minWidth: 200, maxWidth: 320 }}>
+              <Search size={16} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--ink-muted)' }} />
+              <input
+                className="form-control"
+                placeholder={tab === 'detail' ? 'Search in table…' : 'Search student…'}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{ paddingLeft: 34 }}
+              />
+            </div>
+            {q && (
+              <span style={{ fontSize: '0.8rem', color: 'var(--ink-muted)' }}>
+                {tab === 'detail' ? filteredRecords.length : filteredSummary.length} result
+                {(tab === 'detail' ? filteredRecords.length : filteredSummary.length) !== 1 ? 's' : ''}
+              </span>
+            )}
+          </div>
+          {tab === 'person' || tab === 'summary' ? (
             <div className="table-wrap">
               <table>
                 <thead>
@@ -156,18 +239,20 @@ export default function AttendanceReport() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.summary.length === 0 ? (
+                  {filteredSummary.length === 0 ? (
                     <tr>
                       <td colSpan={7} style={{ textAlign: 'center', color: 'var(--ink-muted)' }}>
-                        No attendance records in this range
+                        {q ? 'No students match your search' : 'No attendance records in this range'}
                       </td>
                     </tr>
                   ) : (
-                    data.summary.map((s) => (
-                      <tr key={s.student._id}>
+                    filteredSummary.map((s) => (
+                      <tr key={s.student._id} className="clickable" onClick={() => loadPerson(s.student._id)}>
                         <td>
-                          <strong>{s.student.name}</strong>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>{s.student.phone}</div>
+                          <button type="button" className="attn-name-link" onClick={(e) => { e.stopPropagation(); loadPerson(s.student._id); }}>
+                            <strong>{s.student.name}</strong>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--ink-muted)' }}>{s.student.phone}</div>
+                          </button>
                         </td>
                         <td>
                           <span className="badge badge-info">{s.student.course}</span>
@@ -176,7 +261,7 @@ export default function AttendanceReport() {
                           )}
                         </td>
                         <td style={{ color: 'var(--success)', fontWeight: 600 }}>{s.present}</td>
-                        <td style={{ color: 'var(--danger)', fontWeight: 600 }}>{s.late || 0}</td>
+                        <td style={{ color: 'var(--warning)', fontWeight: 600 }}>{s.late || 0}</td>
                         <td style={{ color: 'var(--danger)', fontWeight: 600 }}>{s.absent}</td>
                         <td>{s.total}</td>
                         <td>
@@ -205,42 +290,43 @@ export default function AttendanceReport() {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.records.length === 0 ? (
+                  {filteredRecords.length === 0 ? (
                     <tr>
                       <td colSpan={7} style={{ textAlign: 'center', color: 'var(--ink-muted)' }}>
-                        No records found
+                        {q ? 'No records match your search' : 'No records found'}
                       </td>
                     </tr>
                   ) : (
-                    data.records.map((r) => {
+                    filteredRecords.map((r) => {
                       const time = formatTime(r.markedAt);
                       const late = !!r.isLate;
                       return (
                         <tr key={r._id} style={late ? { background: 'rgba(220, 38, 38, 0.06)' } : undefined}>
                           <td>{formatDate(r.date)}</td>
                           <td style={{ whiteSpace: 'nowrap' }}>
-                            <span style={{ color: late ? 'var(--danger)' : undefined, fontWeight: late ? 700 : 400 }}>
-                              {time}
-                            </span>
+                            <span style={{ color: late ? 'var(--danger)' : undefined, fontWeight: late ? 700 : 400 }}>{time}</span>
                             {late && (
                               <span className="badge badge-danger" style={{ marginLeft: 6, fontSize: '0.7rem' }}>
                                 Late
                               </span>
                             )}
-                            {r.startTime && (
-                              <div style={{ fontSize: '0.7rem', color: 'var(--ink-muted)' }}>Start {r.startTime}</div>
-                            )}
                           </td>
                           <td>
-                            <strong>{r.student?.name || '—'}</strong>
+                            <button
+                              type="button"
+                              className="attn-name-link"
+                              onClick={() => r.student?._id && loadPerson(r.student._id)}
+                            >
+                              <strong>{r.student?.name || '—'}</strong>
+                            </button>
                           </td>
                           <td>
                             <span className="badge badge-info">{r.course}</span>
                           </td>
                           <td style={{ fontSize: '0.85rem' }}>{r.batch || r.student?.batch || '—'}</td>
                           <td>
-                            <span className={`badge ${r.status === 'P' ? 'badge-success' : 'badge-danger'}`}>
-                              {r.status === 'P' ? 'Present' : 'Absent'}
+                            <span className={`badge ${r.status === 'P' ? (late ? 'badge-warning' : 'badge-success') : 'badge-danger'}`}>
+                              {r.status === 'P' ? (late ? 'Late' : 'Present') : 'Absent'}
                             </span>
                           </td>
                           <td>{r.markedByName || '—'}</td>
